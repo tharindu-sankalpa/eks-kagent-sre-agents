@@ -1,0 +1,15 @@
+# kagent model "grok-4-7": x-ai/grok-4.7 through OpenRouter.
+# Every ModelConfig in this build has this shape. Only metadata.name and
+# spec.model change; the Secret is the same one for all of them.
+apiVersion: kagent.dev/v1alpha2
+kind: ModelConfig
+metadata:
+  name: grok-4-7            # Kubernetes name: no dots or slashes
+  namespace: kagent
+spec:
+  provider: OpenAI    # OpenRouter speaks the OpenAI API
+  model: x-ai/grok-4.7          # OpenRouter model id
+  apiKeySecret: kagent-openrouter
+  apiKeySecretKey: OPENROUTER_API_KEY
+  openAI:
+    baseUrl: https://openrouter.ai/api/v1

@@ -1,0 +1,71 @@
+# Agent 1: read-only diagnosis.
+# Finds out why something is unhealthy. It can read anything and change nothing.
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: cluster-troubleshooter
+  namespace: kagent
+spec:
+  description: Read-only Kubernetes troubleshooter. Explains why pods, deployments and services are unhealthy, from live cluster state.
+  type: Declarative
+  declarative:
+    modelConfig: default-model-config # deepseek/deepseek-v4.1-flash via OpenRouter
+    # The system message is a Go template. The three {{include}} lines pull the
+    # snippets kagent ships in the ConfigMap kagent-builtin-prompts (the same
+    # ones its bundled agents use), so the methodology is not retyped here.
+    promptTemplate:
+      dataSources:
+        - kind: ConfigMap
+          name: kagent-builtin-prompts
+          alias: builtin
+    systemMessage: |
+      You are a Kubernetes troubleshooter for one Amazon EKS cluster.
+
+      {{include "builtin/kubernetes-context"}}
+
+      {{include "builtin/tool-usage-best-practices"}}
+
+      {{include "builtin/safety-guardrails"}}
+
+      ## Rules specific to this agent
+
+      - Call a tool before you state any fact. Never guess names, counts,
+        images or versions.
+      - You cannot change the cluster. If asked to fix, scale, restart or
+        delete something, explain what you would do and say that the
+        sre-operator agent can do it.
+      - Method: start with k8s_get_resources for the resource in question
+        (use output "wide" for pods). Then k8s_describe_resource, then
+        k8s_get_events for the namespace, then k8s_get_pod_logs if the
+        container has started. Stop as soon as the evidence explains the
+        problem.
+      - Report: (1) what is wrong in one sentence, (2) the evidence, quoting
+        the exact event message or log line, (3) the most likely root cause,
+        (4) the fix as a kubectl command or a manifest change.
+      - Keep it short. Use a table when listing more than three resources.
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: kagent-tool-server
+          toolNames:
+            - k8s_get_resources
+            - k8s_describe_resource
+            - k8s_get_events
+            - k8s_get_pod_logs
+            - k8s_get_resource_yaml
+            - k8s_check_service_connectivity
+            - k8s_get_available_api_resources
+            - k8s_get_cluster_configuration
+            - datetime_get_current_time
+    a2aConfig:
+      skills:
+        - id: diagnose-workload
+          name: Diagnose a workload
+          description: Explains why a pod, deployment or service is unhealthy, with the evidence and a fix.
+          tags: [kubernetes, troubleshooting, read-only]
+          examples:
+            - "Why is the pod in namespace demo-broken crash-looping?"
+            - "Which pods in the cluster are not Running, and why?"
+            - "Why does the service checkout in demo-broken have no endpoints?"

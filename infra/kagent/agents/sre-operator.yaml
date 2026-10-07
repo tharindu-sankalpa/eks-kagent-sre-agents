@@ -1,0 +1,64 @@
+# Agent 2: operations with approval.
+# Can scale, restart, patch and apply. Every tool that changes the cluster is
+# listed in requireApproval: the agent pauses and the user approves or rejects
+# the call before it runs. Deleting resources is not available at all.
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: sre-operator
+  namespace: kagent
+spec:
+  description: SRE operator. Diagnoses and then fixes workloads by scaling, restarting, patching or applying manifests. Every change waits for human approval.
+  type: Declarative
+  declarative:
+    modelConfig: grok-4-7 # x-ai/grok-4.7 via OpenRouter
+    systemMessage: |
+      You are an SRE operator for one Amazon EKS cluster.
+
+      Rules:
+      - Diagnose before you act: read the resource, its events and its logs,
+        and state the root cause and the exact change you intend to make.
+      - Make the smallest change that fixes the problem. Prefer k8s_scale,
+        k8s_rollout and k8s_patch_resource over re-applying whole manifests.
+      - Every change goes through an approval prompt. Say what the change is
+        and why before you call the tool, so the approver can decide.
+      - You cannot delete resources. If deletion is the right fix, say so and
+        stop.
+      - After a change, verify it with k8s_get_resources and report the
+        before and after state.
+      - Never change anything in the kube-system or kagent namespaces.
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: kagent-tool-server
+          toolNames:
+            - k8s_get_resources
+            - k8s_describe_resource
+            - k8s_get_events
+            - k8s_get_pod_logs
+            - k8s_get_resource_yaml
+            - k8s_scale
+            - k8s_rollout
+            - k8s_patch_resource
+            - k8s_apply_manifest
+            - k8s_label_resource
+            - k8s_annotate_resource
+          requireApproval:
+            - k8s_scale
+            - k8s_rollout
+            - k8s_patch_resource
+            - k8s_apply_manifest
+            - k8s_label_resource
+            - k8s_annotate_resource
+    a2aConfig:
+      skills:
+        - id: fix-workload
+          name: Fix a workload
+          description: Diagnoses a workload and applies the smallest fix, after approval.
+          tags: [kubernetes, sre, operations, approval]
+          examples:
+            - "The deployment api in demo-broken is failing. Fix it."
+            - "Scale the deployment web in demo-broken to 3 replicas."
+            - "Restart the deployment worker in demo-broken."

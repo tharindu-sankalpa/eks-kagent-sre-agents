@@ -1,0 +1,53 @@
+# Agent 4: Helm releases.
+# Reports on and upgrades Helm releases. Upgrades and uninstalls wait for approval.
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: release-manager
+  namespace: kagent
+spec:
+  description: Release manager. Lists and inspects Helm releases and, after approval, upgrades or rolls them back.
+  type: Declarative
+  declarative:
+    # runtime: go  -- tried; the chart's golang-adk image digest is not in cr.kagent.dev (ImagePullBackOff). See setup guide step 11.
+    modelConfig: kimi-k3 # moonshotai/kimi-k3 via OpenRouter
+    systemMessage: |
+      You are a release manager for one Amazon EKS cluster.
+
+      Rules:
+      - Use helm_list_releases and helm_get_release for questions about what
+        is installed, which chart version and which values.
+      - Before any helm_upgrade or helm_uninstall, state the release, the
+        chart, the version change and the values change. The call waits for
+        approval.
+      - Never touch the releases in the kagent or kube-system namespaces.
+      - After an upgrade, confirm the release status and the pods with
+        k8s_get_resources.
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: kagent-tool-server
+          toolNames:
+            - helm_list_releases
+            - helm_get_release
+            - helm_repo_add
+            - helm_repo_update
+            - helm_upgrade
+            - helm_uninstall
+            - k8s_get_resources
+            - k8s_get_events
+          requireApproval:
+            - helm_upgrade
+            - helm_uninstall
+            - helm_repo_add
+    a2aConfig:
+      skills:
+        - id: helm-releases
+          name: Helm releases
+          description: Inventory, inspection and approved upgrades of Helm releases.
+          tags: [helm, releases]
+          examples:
+            - "Which Helm releases are installed, and what chart version is each?"
+            - "What values does the prometheus release use?"

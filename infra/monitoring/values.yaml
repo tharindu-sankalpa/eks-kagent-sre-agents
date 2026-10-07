@@ -1,0 +1,33 @@
+# Helm values for kube-prometheus-stack (chart prometheus-community/kube-prometheus-stack).
+# Installed into namespace "monitoring". Gives the observability-analyst agent
+# a Prometheus to query, and grafana-mcp a Grafana to talk to.
+#
+# The Grafana admin password is passed with --set at install time, from .env.
+
+prometheus:
+  prometheusSpec:
+    retention: 2d
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          resources:
+            requests:
+              storage: 10Gi # default StorageClass (gp3)
+    resources:
+      requests: { cpu: 200m, memory: 512Mi }
+      limits: { memory: 2Gi }
+
+grafana:
+  enabled: true
+  # grafana.ini: default. Service accounts (used for the grafana-mcp token) are on by default in Grafana 10+.
+  persistence:
+    enabled: false # dashboards come from the chart; nothing to keep
+
+alertmanager:
+  enabled: false # no receivers configured in this build
+
+# EKS runs these control-plane components for you; their endpoints are not scrapeable.
+kubeControllerManager: { enabled: false }
+kubeScheduler: { enabled: false }
+kubeEtcd: { enabled: false }
+kubeProxy: { enabled: false }

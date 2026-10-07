@@ -1,0 +1,19 @@
+# An MCP server deployed by kmcp.
+# kmcp ships no MCP servers of its own; it runs the ones you describe.
+# This one is the reference "fetch" server (a public Python package): it
+# fetches a URL and returns the page as text, so an agent can read a runbook
+# or a vendor doc while troubleshooting. No API key, no image build.
+apiVersion: kagent.dev/v1alpha1
+kind: MCPServer
+metadata:
+  name: fetch
+  namespace: kagent
+spec:
+  transportType: stdio # the package speaks MCP over stdin/stdout
+  stdioTransport: {}
+  deployment:
+    # No image: for cmd "uvx" the kmcp controller defaults to ghcr.io/astral-sh/uv:debian.
+    cmd: uvx
+    args:
+      - mcp-server-fetch
+    port: 3000 # kmcp puts agentgateway in the pod to serve stdio as HTTP on :3000/mcp

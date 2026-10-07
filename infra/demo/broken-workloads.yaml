@@ -1,0 +1,118 @@
+# Five deliberately broken workloads for the agents to diagnose.
+# Each one fails for a different, well-known reason. The reason is in the
+# comment so a reader can check the agents' answers against it.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-broken
+---
+# 1. Image that does not exist -> ImagePullBackOff
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: demo-broken
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: api }
+  template:
+    metadata:
+      labels: { app: api }
+    spec:
+      containers:
+        - name: api
+          image: nginx:1.99.99-does-not-exist
+          ports: [{ containerPort: 80 }]
+---
+# 2. Container exits immediately -> CrashLoopBackOff
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: demo-broken
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: worker }
+  template:
+    metadata:
+      labels: { app: worker }
+    spec:
+      containers:
+        - name: worker
+          image: busybox:1.36
+          command: ["sh", "-c", "echo 'config file /etc/worker/config.yaml not found'; exit 1"]
+---
+# 3. Memory limit far below what the process allocates -> OOMKilled
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cache
+  namespace: demo-broken
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: cache }
+  template:
+    metadata:
+      labels: { app: cache }
+    spec:
+      containers:
+        - name: cache
+          image: polinux/stress:1.0.4
+          command: ["stress", "--vm", "1", "--vm-bytes", "200M", "--vm-hang", "0"]
+          resources:
+            limits: { memory: 64Mi }
+            requests: { memory: 32Mi, cpu: 50m }
+---
+# 4. Service selector does not match the pod labels -> no endpoints
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo-broken
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: web }
+  template:
+    metadata:
+      labels: { app: web }
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.27
+          ports: [{ containerPort: 80 }]
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkout
+  namespace: demo-broken
+spec:
+  selector: { app: checkout } # should be app: web
+  ports: [{ port: 80, targetPort: 80 }]
+---
+# 5. CPU request larger than any node -> Pending, unschedulable
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: batch
+  namespace: demo-broken
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: batch }
+  template:
+    metadata:
+      labels: { app: batch }
+    spec:
+      containers:
+        - name: batch
+          image: busybox:1.36
+          command: ["sleep", "3600"]
+          resources:
+            requests: { cpu: "16" } # nodes are t3.xlarge: 4 vCPU

@@ -1,0 +1,15 @@
+# kagent model "kimi-k3": moonshotai/kimi-k3 through OpenRouter.
+# Every ModelConfig in this build has this shape. Only metadata.name and
+# spec.model change; the Secret is the same one for all of them.
+apiVersion: kagent.dev/v1alpha2
+kind: ModelConfig
+metadata:
+  name: kimi-k3            # Kubernetes name: no dots or slashes
+  namespace: kagent
+spec:
+  provider: OpenAI    # OpenRouter speaks the OpenAI API
+  model: moonshotai/kimi-k3          # OpenRouter model id
+  apiKeySecret: kagent-openrouter
+  apiKeySecretKey: OPENROUTER_API_KEY
+  openAI:
+    baseUrl: https://openrouter.ai/api/v1

@@ -1,0 +1,71 @@
+# Agent 3: metrics.
+# Answers capacity and performance questions from Prometheus (installed in
+# step 8 of the setup guide) and from the Kubernetes API.
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: observability-analyst
+  namespace: kagent
+spec:
+  description: Observability analyst. Answers capacity, usage and saturation questions with PromQL against the in-cluster Prometheus.
+  type: Declarative
+  declarative:
+    modelConfig: gemini-3-8-flash # google/gemini-3.8-flash via OpenRouter
+    systemMessage: |
+      You are an observability analyst for one Amazon EKS cluster.
+
+      Rules:
+      - Prometheus is at http://prometheus-kube-prometheus-prometheus.monitoring:9090.
+        Pass that URL to every prometheus_* tool.
+      - Use prometheus_label_names_tool or prometheus_query_tool to confirm a
+        metric exists before you build a query on it. Metric names in this
+        cluster come from kube-state-metrics, node-exporter, cAdvisor and
+        the kubelet.
+      - Show the PromQL you ran and the raw numbers it returned, then the
+        interpretation. Give units (cores, bytes, percent) and the time range.
+      - The query tool rejects comparison operators (<, >, ==) as "potentially
+        dangerous characters". Do not filter with them. Use topk(), sum by (),
+        rate() and label matchers instead, and compare the numbers yourself.
+      - Use k8s_get_resources when the question is about requests, limits
+        or replica counts rather than measured usage.
+      - The Grafana tools are a second route to the same Prometheus: call
+        list_datasources once, then query_prometheus with the Prometheus
+        datasource uid. Use search_dashboards and list_alert_rules for
+        questions about dashboards and alerts.
+      - You cannot change the cluster.
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: kagent-tool-server
+          toolNames:
+            - prometheus_query_tool
+            - prometheus_query_range_tool
+            - prometheus_label_names_tool
+            - prometheus_targets_tool
+            - prometheus_promql_tool
+            - k8s_get_resources
+            - k8s_describe_resource
+            - datetime_get_current_time
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: kagent-grafana-mcp # the Grafana MCP server kagent's chart ships (65 tools)
+          toolNames:
+            - list_datasources
+            - query_prometheus
+            - list_prometheus_metric_names
+            - search_dashboards
+            - list_alert_rules
+    a2aConfig:
+      skills:
+        - id: capacity-and-usage
+          name: Capacity and usage
+          description: CPU, memory and restart analysis per node, namespace or pod, from Prometheus.
+          tags: [prometheus, promql, capacity, observability]
+          examples:
+            - "Which pods used the most CPU in the last 15 minutes?"
+            - "How much of each node's allocatable memory is in use right now?"
+            - "Which containers restarted in the last hour?"

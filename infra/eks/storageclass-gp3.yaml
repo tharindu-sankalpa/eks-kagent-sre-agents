@@ -1,0 +1,16 @@
+# Default StorageClass backed by the EBS CSI driver.
+# EKS ships a "gp2" class that is not marked default, so a PersistentVolumeClaim
+# without storageClassName (kagent's PostgreSQL and Prometheus) stays Pending.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  encrypted: "true"
+volumeBindingMode: WaitForFirstConsumer # create the volume in the AZ of the pod that uses it
+reclaimPolicy: Delete
+allowVolumeExpansion: true

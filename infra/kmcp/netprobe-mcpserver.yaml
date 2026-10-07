@@ -1,0 +1,31 @@
+# The bring-your-own MCP server (byo/netprobe-mcp), built with `kmcp build`
+# and pushed to ECR, run by kmcp with the HTTP transport.
+#
+# Apply with the account id filled in:
+#   sed "s/<ACCOUNT_ID>/$(aws sts get-caller-identity --query Account --output text)/" \
+#     infra/kmcp/netprobe-mcpserver.yaml | kubectl apply -f -
+#
+# This is the manifest `kmcp deploy --transport http --image ... --no-inspector`
+# generates, kept as a file so it is visible in the repository.
+apiVersion: kagent.dev/v1alpha1
+kind: MCPServer
+metadata:
+  name: netprobe-mcp
+  namespace: kagent
+spec:
+  transportType: http # the container serves MCP over HTTP itself; no agentgateway adapter is added
+  httpTransport:
+    targetPort: 3000
+    path: /mcp
+  deployment:
+    image: <ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/netprobe-mcp:0.1.0
+    port: 3000 # kagent will call http://netprobe-mcp.kagent:3000/mcp
+    cmd: python
+    args:
+      - src/main.py
+      - --transport
+      - http
+      - --host
+      - 0.0.0.0
+      - --port
+      - "3000"

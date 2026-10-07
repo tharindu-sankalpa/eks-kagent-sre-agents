@@ -1,0 +1,36 @@
+# Agent 6: bring your own.
+# The container is byo/incident-reporter-agent: a while-loop ReAct agent
+# written without a framework, served over A2A with the A2A Python SDK.
+# kagent runs it like any other agent (Deployment + Service, A2A at
+# /api/a2a/kagent/incident-reporter/), but the model, the prompt and the
+# tool handling are all inside the image, not in this resource.
+#
+# Apply with the account id filled in:
+#   sed "s/<ACCOUNT_ID>/$(aws sts get-caller-identity --query Account --output text)/" \
+#     infra/kagent/agents/incident-reporter.yaml | kubectl apply -f -
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: incident-reporter
+  namespace: kagent
+spec:
+  description: Bring-your-own agent. Writes an incident report (summary, evidence, root cause, fix) for a namespace, using the built-in tool server and the netprobe MCP server directly.
+  type: BYO
+  byo:
+    deployment:
+      image: <ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/incident-reporter-agent:0.1.0
+      env:
+        - name: OPENROUTER_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kagent-openrouter
+              key: OPENROUTER_API_KEY
+        - name: MODEL
+          value: deepseek/deepseek-v4.1-flash
+        - name: KAGENT_TOOLS_URL
+          value: http://kagent-tools.kagent:8084/mcp
+        - name: NETPROBE_URL
+          value: http://netprobe-mcp.kagent:3000/mcp
+      resources:
+        requests: { cpu: 100m, memory: 256Mi }
+        limits: { memory: 512Mi }

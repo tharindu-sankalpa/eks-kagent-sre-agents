@@ -1,0 +1,53 @@
+# Agent 7: the orchestrator.
+# It has no Kubernetes tools. Its tools are the other agents (type: Agent),
+# which kagent exposes to it as callable tools over A2A. Its prompt lives in a
+# ConfigMap (systemMessageFrom) and uses the built-in snippets (promptTemplate).
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: sre-orchestrator
+  namespace: kagent
+spec:
+  description: SRE orchestrator. Routes a request to the right specialist agents, combines their findings, and involves the operator agent only when a change is asked for.
+  type: Declarative
+  declarative:
+    modelConfig: claude-sonnet-5-5 # anthropic/claude-sonnet-5.5 via OpenRouter
+    systemMessageFrom:
+      type: ConfigMap
+      name: sre-orchestrator-prompt
+      key: system.md
+    promptTemplate:
+      dataSources:
+        - kind: ConfigMap
+          name: kagent-builtin-prompts
+          alias: builtin
+    # The default agent pod limit is 1 GiB. The orchestrator holds several
+    # sub-agent conversations in memory at once and was OOMKilled at that
+    # limit when three requests ran concurrently (setup guide, step 16).
+    deployment:
+      resources:
+        requests: { cpu: 200m, memory: 512Mi }
+        limits: { memory: 2Gi }
+    tools:
+      - type: Agent
+        agent: { name: cluster-troubleshooter }
+      - type: Agent
+        agent: { name: observability-analyst }
+      - type: Agent
+        agent: { name: runbook-assistant }
+      - type: Agent
+        agent: { name: release-manager }
+      - type: Agent
+        agent: { name: incident-reporter }
+      - type: Agent
+        agent: { name: sre-operator }
+    a2aConfig:
+      skills:
+        - id: orchestrate
+          name: Orchestrate an SRE task
+          description: Delegates diagnosis, metrics, documentation, release and change work to specialist agents and reports the combined result.
+          tags: [sre, orchestration, multi-agent]
+          examples:
+            - "Something is wrong in namespace demo-broken. Find every problem and tell me the fixes."
+            - "Is the cluster under memory pressure, and is anything restarting because of it?"
+            - "Fix the web service in demo-broken so that checkout has endpoints."

@@ -1,0 +1,55 @@
+# Helm values for kagent (chart: oci://ghcr.io/kagent-dev/kagent/helm/kagent, version 0.9.10).
+# The chart bundles kmcp 0.3.0 (kmcp.enabled defaults to true), the
+# kagent-tools MCP server 0.2.1 and a bundled PostgreSQL that keeps agent
+# sessions and state.
+
+# Default model: OpenRouter through its OpenAI-compatible API.
+# The chart renders this block as the ModelConfig "default-model-config":
+#   spec.provider: OpenAI, spec.openAI.baseUrl, spec.apiKeySecret/apiKeySecretKey.
+# The Secret "kagent-openrouter" is created with kubectl before the install
+# (see docs/setup-guide.md); the chart does not create it because apiKey is unset.
+providers:
+  default: openAI
+  openAI:
+    provider: OpenAI
+    model: deepseek/deepseek-v4.1-flash
+    apiKeySecretRef: kagent-openrouter
+    apiKeySecretKey: OPENROUTER_API_KEY
+    config:
+      baseUrl: https://openrouter.ai/api/v1
+
+# kagent state survives agent and controller restarts in this database.
+database:
+  postgres:
+    bundled:
+      enabled: true
+      storage: 2Gi # uses the default StorageClass (gp3)
+
+# Built-in MCP servers.
+kagent-tools:
+  enabled: true # Kubernetes, Helm, Istio, Cilium, Argo, Kubescape and Prometheus tools on :8084/mcp
+querydoc:
+  enabled: true # documentation search MCP server
+grafana-mcp:
+  enabled: true # needs the Grafana from infra/monitoring (setup guide step 8)
+  grafana:
+    url: http://prometheus-grafana.monitoring
+    # serviceAccountToken is passed with --set at install time, from .env
+  # mcp/grafana:latest only accepts loopback Host headers by default; the
+  # kagent controller calls it by its Service name.
+  args:
+    - --allowed-hosts
+    - kagent-grafana-mcp.kagent:8000,kagent-grafana-mcp.kagent
+
+# The ten pre-built agents are switched off. Every agent in this build is
+# defined in infra/kagent/agents/ so each one is visible as YAML.
+k8s-agent: { enabled: false }
+kgateway-agent: { enabled: false }
+istio-agent: { enabled: false }
+promql-agent: { enabled: false }
+observability-agent: { enabled: false }
+argo-rollouts-agent: { enabled: false }
+helm-agent: { enabled: false }
+cilium-policy-agent: { enabled: false }
+cilium-manager-agent: { enabled: false }
+cilium-debug-agent: { enabled: false }

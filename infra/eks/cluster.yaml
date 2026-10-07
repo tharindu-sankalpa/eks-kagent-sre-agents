@@ -1,0 +1,49 @@
+# eksctl ClusterConfig for the lab cluster.
+#
+#   eksctl create cluster -f infra/eks/cluster.yaml --kubeconfig .kube/config
+#
+# Creates a dedicated VPC (2 AZs, one NAT gateway), the EKS control plane,
+# one managed node group in private subnets, and the add-ons the stack needs.
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: kagent-sre-lab
+  region: ap-south-1
+  version: "1.34"
+
+availabilityZones:
+  - ap-south-1a
+  - ap-south-1b
+
+vpc:
+  nat:
+    gateway: Single # one NAT gateway instead of one per AZ; enough for a lab
+
+addonsConfig:
+  # Let eksctl create the EKS Pod Identity association an add-on needs
+  # (here: the IAM role for the EBS CSI controller).
+  autoApplyPodIdentityAssociations: true
+
+addons:
+  - name: vpc-cni
+  - name: kube-proxy
+  - name: coredns
+  - name: metrics-server
+  # Pod Identity agent: required by autoApplyPodIdentityAssociations.
+  - name: eks-pod-identity-agent
+  # EBS CSI driver: the in-tree gp2 StorageClass cannot provision volumes on
+  # its own. kagent's PostgreSQL and Prometheus need volumes.
+  - name: aws-ebs-csi-driver
+
+managedNodeGroups:
+  - name: workers
+    instanceType: t3.xlarge # 4 vCPU, 16 GiB
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 3
+    volumeSize: 50
+    volumeType: gp3
+    privateNetworking: true # nodes have no public IPs; egress goes via the NAT gateway
+    labels:
+      role: workers

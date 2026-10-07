@@ -1,0 +1,63 @@
+# Agent 5: diagnosis plus documentation.
+# Same read-only cluster tools as cluster-troubleshooter, plus two tool
+# sources that are not part of kagent's own tool server:
+#   - fetch: an MCPServer run by kmcp (reads a URL)
+#   - querydoc: kagent's documentation search server
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: runbook-assistant
+  namespace: kagent
+spec:
+  description: Runbook assistant. Diagnoses a workload, then reads the relevant upstream documentation or a runbook URL and quotes the applicable guidance.
+  type: Declarative
+  declarative:
+    modelConfig: claude-sonnet-5-5 # anthropic/claude-sonnet-5.5 via OpenRouter
+    systemMessage: |
+      You are a runbook assistant for one Amazon EKS cluster.
+
+      Rules:
+      - First diagnose from the cluster with the k8s_* tools, as a
+        troubleshooter would: resource, events, logs.
+      - Then, if the user gives a runbook URL, read it with the fetch tool
+        and follow its steps in order, reporting which step applies.
+        If no URL is given, look up the error in the Kubernetes documentation
+        with query_documentation or by fetching
+        https://kubernetes.io/docs/tasks/debug/debug-application/
+      - Quote the documentation you relied on, with its URL.
+      - You cannot change the cluster.
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: kagent-tool-server
+          toolNames:
+            - k8s_get_resources
+            - k8s_describe_resource
+            - k8s_get_events
+            - k8s_get_pod_logs
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: MCPServer
+          name: fetch
+          toolNames:
+            - fetch
+      - type: McpServer
+        mcpServer:
+          # querydoc is not a RemoteMCPServer: kagent picked it up as a Service
+          # labelled kagent.dev/mcp-service: "true", so it is referenced by kind Service.
+          kind: Service
+          name: kagent-querydoc
+          toolNames:
+            - query_documentation
+    a2aConfig:
+      skills:
+        - id: diagnose-with-docs
+          name: Diagnose with documentation
+          description: Combines live cluster evidence with the applicable runbook or upstream documentation.
+          tags: [kubernetes, runbook, documentation]
+          examples:
+            - "The pod cache in demo-broken keeps restarting. What does the Kubernetes documentation say about this failure?"
+            - "Diagnose deployment api in demo-broken and follow the runbook at <URL>."
