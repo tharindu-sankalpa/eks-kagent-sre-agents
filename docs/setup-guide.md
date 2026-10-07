@@ -860,7 +860,15 @@ $ aws ecr delete-repository --region $AWS_REGION --repository-name netprobe-mcp 
 $ aws ecr delete-repository --region $AWS_REGION --repository-name incident-reporter-agent --force
 ```
 
-(the `eksctl delete cluster` output and the leftover checks are recorded below once it finishes)
+As run:
+
+```
+$ eksctl delete cluster --name $CLUSTER --region $AWS_REGION --wait
+2026-10-07 15:46:04 [ℹ]  will delete stack "eksctl-kagent-sre-lab-cluster"
+2026-10-07 15:47:33 [✔]  all cluster resources were deleted
+```
+
+About 14 minutes from the first `helm uninstall` to the last line. The checks afterwards returned no volumes, no stacks, no clusters, no NAT gateways and no running instances; `describe-repositories` returned the two kept ECR repositories. Full log: [results/raw/eksctl-delete-cluster.log](../results/raw/eksctl-delete-cluster.log).
 
 Afterwards, check that nothing billable is left:
 
