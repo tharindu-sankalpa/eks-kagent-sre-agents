@@ -1,0 +1,28 @@
+Service `checkout` in `demo-broken` now has endpoints.
+
+**What was wrong:** The Service selected `app=checkout`, but no pod has that label. There is also no `checkout` Deployment or ReplicaSet in the namespace. That left the Service with an empty EndpointSlice.
+
+**Evidence**
+- `cluster_troubleshooter` reported that the selector was `app: checkout`. The pods carried `app=api`, `batch`, `cache`, `web` and `worker`.
+- The three `web-894868994-*` pods were `1/1 Ready` and listen on port 80, which matches the Service's `targetPort: 80`.
+- No container in the namespace defines a readiness probe, so readiness filtering was not the cause.
+
+**Root cause:** The selector didn't match any pod labels.
+
+**Change made (you approved it):** I had `sre_operator` patch only `spec.selector`, from `{app: checkout}` to `{app: web}`. The ClusterIP, ports and type are unchanged, and no pods restarted.
+
+**Result (reported by `sre_operator`)**
+- Endpoints went from `<none>` to `192.168.97.70`, `192.168.124.72` and `192.168.75.63`, all on port 80.
+- EndpointSlice `checkout-lbfbm` lists the same three IPs, each `ready=true` and `serving=true`.
+
+**Rollback:** Patch the selector back to `{"app":"checkout"}`.
+
+**Caveats**
+- I inferred that `web` is the intended backend from the matching port. If `checkout` should be its own workload, deploy one labeled `app=checkout` and revert the selector.
+- Other pods in the namespace are unhealthy and I didn't touch them:
+  - `api`: ImagePullBackOff
+  - `batch`: Pending (insufficient CPU)
+  - `cache`: CrashLoopBackOff (OOMKilled)
+  - `worker`: CrashLoopBackOff (exit 1)
+
+**Specialists used:** `cluster_troubleshooter` for the diagnosis and `sre_operator` for the patch.

@@ -1,0 +1,92 @@
+Agent: observability-analyst
+Q: How much CPU and memory is each node using right now, as a share of its capacity?
+State: completed (46s)
+
+### Overview of Cluster Nodes
+
+The EKS cluster currently has **2 nodes**:
+1. `ip-192-168-79-101.ap-south-1.compute.internal` (Node Exporter IP: `192.168.79.101:9100`)
+2. `ip-192-168-121-33.ap-south-1.compute.internal` (Node Exporter IP: `192.168.121.33:9100`)
+
+---
+
+### 1. Node Capacity
+
+From `kube-state-metrics` (`kube_node_status_capacity`):
+
+#### PromQL Query:
+```promql
+kube_node_status_capacity{resource=~"cpu|memory"}
+```
+
+#### Raw Results:
+- `ip-192-168-79-101.ap-south-1.compute.internal`:
+  - **CPU**: `4 cores` (raw value: `4`)
+  - **Memory**: `16,552,800,256 bytes` (~15.42 GiB / ~16.55 GB)
+- `ip-192-168-121-33.ap-south-1.compute.internal`:
+  - **CPU**: `4 cores` (raw value: `4`)
+  - **Memory**: `16,552,808,448 bytes` (~15.42 GiB / ~16.55 GB)
+
+---
+
+### 2. Current CPU Usage (% of Capacity)
+
+Calculated across a 5-minute rate window (`[5m]`) using `node_cpu_seconds_total`.
+
+#### A. Total Non-Idle Cores Used:
+#### PromQL Query:
+```promql
+sum by (instance) (rate(node_cpu_seconds_total{mode!="idle"}[5m]))
+```
+#### Raw Results:
+- `192.168.79.101:9100`: `0.217` cores used out of 4 cores
+- `192.168.121.33:9100`: `0.445` cores used out of 4 cores
+
+#### B. CPU Utilization as % of Total Node Capacity:
+#### PromQL Query:
+```promql
+100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])))
+```
+#### Raw Results:
+- `ip-192-168-79-101.ap-south-1.compute.internal` (`192.168.79.101:9100`): **5.85%** (raw value: `5.8472222222221815%`)
+- `ip-192-168-121-33.ap-south-1.compute.internal` (`192.168.121.33:9100`): **8.79%** (raw value: `8.787962962962947%`)
+
+---
+
+### 3. Current Memory Usage (% of Capacity)
+
+Calculated based on available memory relative to total physical memory using `node_memory_MemTotal_bytes` and `node_memory_MemAvailable_bytes`.
+
+#### A. Raw Memory Values:
+#### PromQL Queries:
+```promql
+node_memory_MemTotal_bytes
+node_memory_MemAvailable_bytes
+```
+#### Raw Results:
+- `ip-192-168-79-101.ap-south-1.compute.internal` (`192.168.79.101:9100`):
+  - Total: `16,552,800,256 bytes` (15.42 GiB)
+  - Available: `13,953,650,688 bytes` (13.00 GiB)
+  - Used: `2,599,149,568 bytes` (2.42 GiB)
+- `ip-192-168-121-33.ap-south-1.compute.internal` (`192.168.121.33:9100`):
+  - Total: `16,552,808,448 bytes` (15.42 GiB)
+  - Available: `14,009,942,016 bytes` (13.05 GiB)
+  - Used: `2,542,866,432 bytes` (2.37 GiB)
+
+#### B. Memory Utilization as % of Total Node Capacity:
+#### PromQL Query:
+```promql
+100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))
+```
+#### Raw Results:
+- `ip-192-168-79-101.ap-south-1.compute.internal` (`192.168.79.101:9100`): **15.70%** (raw value: `15.702174422468907%`)
+- `ip-192-168-121-33.ap-south-1.compute.internal` (`192.168.121.33:9100`): **15.36%** (raw value: `15.362144979737524%`)
+
+---
+
+### Summary Table
+
+| Node | CPU Capacity | CPU Usage (Cores) | CPU Usage (% of Capacity) | Memory Capacity | Memory Used | Memory Usage (% of Capacity) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **`ip-192-168-79-101`** | 4 cores | 0.22 cores | **5.85%** | 15.42 GiB | 2.42 GiB | **15.70%** |
+| **`ip-192-168-121-33`** | 4 cores | 0.44 cores | **8.79%** | 15.42 GiB | 2.37 GiB | **15.36%** |

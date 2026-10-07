@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","id":5,"result":{"content":[{"type":"text","text":"{\"connected\":false,\"error\":\"[Errno 111] Connection refused\",\"connect_ms\":1.6}"}],"structuredContent":{"connected":false,"error":"[Errno 111] Connection refused","connect_ms":1.6},"isError":false}}

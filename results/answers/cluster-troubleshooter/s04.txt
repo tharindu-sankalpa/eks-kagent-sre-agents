@@ -1,0 +1,64 @@
+Agent: cluster-troubleshooter
+Q: The Service checkout in namespace demo-broken returns connection refused. Why?
+State: completed (52s)
+
+## 1. What's wrong
+
+The `checkout` Service is a ClusterIP with **zero endpoints** — its selector `app=checkout` matches no pod in `demo-broken`, so kube-proxy has no backend to forward to and rejects the connection (`curl` exit status 7 = connection refused).
+
+## 2. Evidence
+
+| Source | Exact output |
+|---|---|
+| `kubectl get svc checkout -n demo-broken` | `SELECTOR` = `app=checkout`, `PORT(S)` = `80/TCP` |
+| `kubectl get endpoints checkout -n demo-broken` | `checkout   <none>` (age 3h18m) |
+| Connectivity test | `curl -s checkout.demo-broken.svc.cluster.local:80` → `exit status 7` |
+| `kubectl get deploy -n demo-broken` | selectors are `app=api`, `app=batch`, `app=cache`, `app=web`, `app=worker` — **no `app=checkout`** |
+| Pod labels (`get pods -o json`) | `app: api`, `app: batch`, `app: cache`, `app: web`, `app: worker` |
+
+No pod, ReplicaSet, or Deployment in the namespace carries `app=checkout`, and no EndpointSlice was ever populated (Endpoints is empty with age equal to the Service's age). This is not a transient failure.
+
+## 3. Most likely root cause
+
+**Selector/label mismatch — orphan Service.** The `checkout` Service was applied with `selector: {app: checkout}` but no workload with that label exists. Because the selector matches nothing, the Endpoints object stays empty permanently and connections to `10.100.237.153:80` get an immediate TCP RST → "connection refused" (rather than a timeout, which is what you'd see if a pod existed but wasn't listening).
+
+## 4. Fix
+
+Correct the selector to point at the intended backend workload, since no `app=checkout` workload exists to relabel. Two candidates both expose `containerPort: 80`, matching `port: 80 / targetPort: 80`:
+
+- `app: web` — `nginx:1.27`, **3/3 Running**, currently the only healthy port-80 backend.
+- `app: api` — `nginx:1.99.99-does-not-exist`, **0/1 ImagePullBackOff**; selecting this would still refuse connections until the image is fixed.
+
+I'd verify which one is intended before changing anything. If `web` is the intended backend (e.g. `web` is the checkout frontend), the change is:
+
+```bash
+kubectl -n demo-broken patch svc checkout \
+  -p '{"spec":{"selector":{"app":"web"}}}'
+```
+
+Or as a manifest change (also clears the stale `last-applied-configuration`:
+
+```yaml
+spec:
+  selector:
+    app: web      # was: checkout
+  ports:
+    - port: 80
+      targetPort: 80
+```
+
+Verify afterwards:
+
+```bash
+kubectl -n demo-broken get endpoints checkout        # expect 3 IPs on port 80
+kubectl -n demo-broken run curl-test --rm -it --image=curlimages/curl -- \
+  curl -sv checkout.demo-broken.svc.cluster.local:80
+```
+
+Rollback: the previous state is a one-line revert — `kubectl -n demo-broken patch svc checkout -p '{"spec":{"selector":{"app":"checkout"}}}'` (returns it to the current no-endpoints state; the Service itself is otherwise untouched — no pods are deleted or restarted by this change).
+
+**I cannot modify the cluster — the `sre-operator` agent can apply the patch above.**
+
+---
+
+Other unhealthy workloads in `demo-broken` (not the cause, but you may hit them next): `api` ImagePullBackOff (image tag `1.99.99-does-not-exist` not found), `worker` CrashLoopBackOff (`exit 1`: `config file /etc/worker/config.yaml not found`), `cache` CrashLoopBackOff (`exit 137`, OOMKilled, 43 restarts — 64Mi limit vs `--vm-bytes 200M`), `batch` Pending (`0/2 nodes are available: 2 Insufficient cpu`) on a 16-CPU request.

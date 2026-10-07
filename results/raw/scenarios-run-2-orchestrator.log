@@ -1,0 +1,3 @@
+sre-orchestrator/s13  working  180s  tools: kagent__NS__cluster_troubleshooter×1 kagent__NS__incident_reporter×1
+sre-orchestrator/s14  working  50s  tools: kagent__NS__cluster_troubleshooter×1 kagent__NS__observability_analyst×1
+sre-orchestrator/s15  no-status  0s  tools: 

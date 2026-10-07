@@ -1,0 +1,48 @@
+Agent: cluster-troubleshooter
+Q: Why does the pod of deployment worker in namespace demo-broken keep restarting? Quote the log line.
+State: completed (8s)
+
+## What's wrong
+The `worker` container exits immediately with code 1 on every start, so the kubelet crash-loops it — 43 restarts and counting.
+
+## Evidence
+Log line (the container's only output):
+```
+config file /etc/worker/config.yaml not found
+```
+Corroborating state from `describe pod worker-59c46dcdc4-mtt5x`:
+- `Last State: Terminated, Reason: Error, Exit Code: 1` (Started and Finished in the same second)
+- `Restart Count: 43`, `State: Waiting, Reason: CrashLoopBackOff`
+- Kubelet event: `Back-off restarting failed container worker in pod worker-59c46dcdc4-mtt5x_demo-broken(e5d37306-67d4-4f32-b2d9-3482f932633e)` (x903)
+
+## Root cause
+The container's command is a stub that always fails — it is not a real application and never waits or serves:
+```
+Command:
+  sh -c echo 'config file /etc/worker/config.yaml not found'; exit 1
+```
+So this is an intentional/broken manifest: the process itself exits 1. It is *not* an image, resource, or node issue (image `busybox:1.36` pulls fine; pod schedules fine).
+
+## Fix
+Correct the deployment's container command to a long-running process, and/or supply the missing config it expects. For a quick patch on this namespace:
+
+```bash
+kubectl -n demo-broken patch deployment worker --type=json \
+  -p='[{"op":"replace","path":"/spec/template/spec/containers/0/command",
+        "value":["sh","-c","while true; do sleep 3600; done"]}]'
+```
+
+Or, if the container genuinely needs `/etc/worker/config.yaml`, mount it from a ConfigMap:
+```bash
+kubectl -n demo-broken create configmap worker-config \
+  --from-file=config.yaml=/path/to/config.yaml
+# then add a volume + volumeMount at /etc/worker/
+```
+
+I can't make changes to this cluster — the **sre-operator** agent can apply either fix. After patching, verify with:
+```bash
+kubectl -n demo-broken rollout status deployment/worker
+kubectl -n demo-broken get pods -l app=worker
+```
+
+Note: the same namespace has unrelated faults — `api` is in `ImagePullBackOff` (image `nginx:1.99.99-does-not-exist`), `cache` is in `CrashLoopBackOff`, and `batch` is `Pending` due to `2 Insufficient cpu`. Let me know if you want those diagnosed too.

@@ -1,0 +1,34 @@
+Agent: cluster-troubleshooter
+Q: Why is the pod of deployment batch in namespace demo-broken Pending?
+State: completed (5s)
+
+**What's wrong:** Deployment `batch`'s pod is Pending because it requests **16 CPUs**, which no node in the cluster can satisfy.
+
+**Evidence**
+
+| Source | Detail |
+|---|---|
+| Pod status | `batch-584bc7b947-t59cn` — `Pending`, `PodScheduled False` |
+| Pod spec (describe) | Container `batch`, image `busybox:1.36`, command `sleep 3600`, `Requests: cpu: 16` |
+| Event (describe/events) | `FailedScheduling` ×45 over 3h19m: **"0/2 nodes are available: 2 Insufficient cpu. no new claims to deallocate, preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling."** |
+| Nodes | Only 2 nodes (`ip-192-168-121-33`, `ip-192-168-79-101`), both `Ready` |
+
+**Root cause:** The pod spec requests `cpu: 16` (16 full cores) with no node selector/affinity. Neither of the two nodes has 16 free CPUs, so the scheduler can never place it. This is a resource-request configuration error, not an infrastructure failure — both nodes are healthy and other pods are running on them.
+
+**Fix (needs a change — outside my read-only scope):** Lower the request to a realistic value in the deployment's container resources. For example:
+
+```
+kubectl -n demo-broken set resources deployment/batch --requests=cpu=100m
+```
+
+or edit the manifest:
+
+```yaml
+containers:
+  - name: batch
+    resources:
+      requests:
+        cpu: "100m"     # was "16"
+```
+
+After that the ReplicaSet will create a schedulable pod. If 16 CPUs is genuinely required, the alternative is to add a node with ≥16 allocatable CPUs (e.g., a larger instance type or a dedicated node group) — the `sre-operator` agent can apply either change.

@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","id":9,"result":{"content":[{"type":"text","text":"[Kubernetes] exec curl-test-8586 -n demo-broken -- curl -s checkout failed: exit status 7"}],"isError":true}}

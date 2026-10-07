@@ -1,0 +1,3 @@
+sre-orchestrator/s13  working  180s  tools: kagent__NS__cluster_troubleshooter×1 kagent__NS__incident_reporter×1
+sre-orchestrator/s14  completed  78s  tools: kagent__NS__cluster_troubleshooter×1 kagent__NS__observability_analyst×1
+sre-orchestrator/s15  input-required  32s  tools: adk_request_confirmation×2 ask_user×1 kagent__NS__cluster_troubleshooter×1

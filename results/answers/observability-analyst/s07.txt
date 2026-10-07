@@ -1,0 +1,40 @@
+Agent: observability-analyst
+Q: Which containers in namespace demo-broken restarted most in the last 30 minutes, and how many times?
+State: completed (30s)
+
+### PromQL Query Executed
+
+To measure the restart count delta over the last 30 minutes, the following query was executed:
+
+```promql
+kube_pod_container_status_restarts_total{namespace="demo-broken"} - (kube_pod_container_status_restarts_total{namespace="demo-broken"} offset 30m)
+```
+
+And aggregated by container:
+
+```promql
+sum by (container) (kube_pod_container_status_restarts_total{namespace="demo-broken"} - (kube_pod_container_status_restarts_total{namespace="demo-broken"} offset 30m))
+```
+
+---
+
+### Raw Numbers Returned
+
+**Time Range:** Last 30 minutes (~`09:02 UTC` to `09:32 UTC` on October 7, 2026)  
+**Unit:** restarts (count)
+
+| Container | Pod | Restarts at `T-30m` | Restarts at `Now` | Net Restarts in Last 30m |
+| :--- | :--- | :--- | :--- | :--- |
+| `worker` | `worker-59c46dcdc4-mtt5x` | 37 | 43 | **6** |
+| `cache` | `cache-7d9bbbd4cc-kr5sx` | 37 | 43 | **6** |
+| `web` | `web-894868994-c6g99` | 0 | 0 | **0** |
+| `web` | `web-894868994-qm2bv` | 0 | 0 | **0** |
+| `api` | `api-74dd9997fd-cfx82` | 0 | 0 | **0** |
+
+---
+
+### Interpretation
+
+- The containers **`worker`** (pod `worker-59c46dcdc4-mtt5x`) and **`cache`** (pod `cache-7d9bbbd4cc-kr5sx`) tied for restarting the most in the last 30 minutes.
+- Each restarted **6 times** over the 30-minute window (both going from 37 to 43 cumulative restarts, averaging roughly one restart every ~5 minutes due to `CrashLoopBackOff` backoff delay).
+- No other containers in the `demo-broken` namespace restarted during this window.

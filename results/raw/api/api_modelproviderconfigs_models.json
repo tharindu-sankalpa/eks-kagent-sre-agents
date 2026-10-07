@@ -1,0 +1,110 @@
+{
+    "error": false,
+    "data": [
+        {
+            "name": "OpenAI",
+            "optionalParams": [
+                "baseUrl",
+                "organization",
+                "temperature",
+                "maxTokens",
+                "topP",
+                "frequencyPenalty",
+                "presencePenalty",
+                "seed",
+                "n",
+                "timeout",
+                "reasoningEffort",
+                "tokenExchange"
+            ],
+            "requiredParams": [],
+            "type": "OpenAI"
+        },
+        {
+            "name": "Anthropic",
+            "optionalParams": [
+                "baseUrl",
+                "maxTokens",
+                "temperature",
+                "topP",
+                "topK"
+            ],
+            "requiredParams": [],
+            "type": "Anthropic"
+        },
+        {
+            "name": "AzureOpenAI",
+            "optionalParams": [
+                "azureDeployment",
+                "azureAdToken",
+                "temperature",
+                "maxTokens",
+                "topP"
+            ],
+            "requiredParams": [
+                "azureEndpoint",
+                "apiVersion"
+            ],
+            "type": "AzureOpenAI"
+        },
+        {
+            "name": "Ollama",
+            "optionalParams": [
+                "host",
+                "options"
+            ],
+            "requiredParams": [],
+            "type": "Ollama"
+        },
+        {
+            "name": "Gemini",
+            "optionalParams": [],
+            "requiredParams": [],
+            "type": "Gemini"
+        },
+        {
+            "name": "GeminiVertexAI",
+            "optionalParams": [
+                "",
+                "maxOutputTokens",
+                "candidateCount",
+                "responseMimeType"
+            ],
+            "requiredParams": [],
+            "type": "GeminiVertexAI"
+        },
+        {
+            "name": "AnthropicVertexAI",
+            "optionalParams": [
+                "",
+                "maxTokens"
+            ],
+            "requiredParams": [],
+            "type": "AnthropicVertexAI"
+        },
+        {
+            "name": "Bedrock",
+            "optionalParams": [
+                "additionalModelRequestFields",
+                "promptCaching",
+                "cacheTTL"
+            ],
+            "requiredParams": [
+                "region"
+            ],
+            "type": "Bedrock"
+        },
+        {
+            "name": "SAPAICore",
+            "optionalParams": [
+                "resourceGroup",
+                "authUrl"
+            ],
+            "requiredParams": [
+                "baseUrl"
+            ],
+            "type": "SAPAICore"
+        }
+    ],
+    "message": "Successfully listed supported model providers"
+}

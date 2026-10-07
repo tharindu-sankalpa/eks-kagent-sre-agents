@@ -1,0 +1,1 @@
+{"error":false,"data":[{"name":"default","status":"Active"},{"name":"demo-broken","status":"Active"},{"name":"kagent","status":"Active"},{"name":"kube-node-lease","status":"Active"},{"name":"kube-public","status":"Active"},{"name":"kube-system","status":"Active"},{"name":"monitoring","status":"Active"}],"message":"Successfully listed namespaces"}

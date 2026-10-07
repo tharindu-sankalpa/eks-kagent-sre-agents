@@ -1,0 +1,5 @@
+Agent: sre-orchestrator
+Q: Something is wrong in namespace demo-broken. Find every problem and give me the fix for each. Do not change anything.
+State: working (180s, streamed)
+
+

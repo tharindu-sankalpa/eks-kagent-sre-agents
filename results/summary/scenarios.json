@@ -1,0 +1,220 @@
+[
+ {
+  "id": "s13",
+  "agent": "sre-orchestrator",
+  "state": "working",
+  "secs": null,
+  "calls": 2,
+  "tools": [
+   "kagent__NS__cluster_troubleshooter",
+   "kagent__NS__incident_reporter"
+  ],
+  "question": "Something is wrong in namespace demo-broken. Find every problem and give me the fix for each. Do not change anything.",
+  "first_line": "(no answer text)"
+ },
+ {
+  "id": "s14",
+  "agent": "sre-orchestrator",
+  "state": "completed",
+  "secs": null,
+  "calls": 2,
+  "tools": [
+   "kagent__NS__cluster_troubleshooter",
+   "kagent__NS__observability_analyst"
+  ],
+  "question": "Is the cluster under CPU or memory pressure right now, and is anything in demo-broken restarting because of it?",
+  "first_line": "**The cluster is not under CPU or memory pressure. Two pods in demo-broken are restarting, but only one of them is restarting because of mem"
+ },
+ {
+  "id": "s15",
+  "agent": "sre-orchestrator",
+  "state": "completed",
+  "secs": null,
+  "calls": 7,
+  "tools": [
+   "adk_request_confirmation",
+   "ask_user",
+   "kagent__NS__cluster_troubleshooter",
+   "kagent__NS__sre_operator"
+  ],
+  "question": "Fix the Service checkout in namespace demo-broken so that it has endpoints. Tell me what you intend to change before you do it.",
+  "first_line": "Service `checkout` in `demo-broken` now has endpoints."
+ },
+ {
+  "id": "s01",
+  "agent": "cluster-troubleshooter",
+  "state": "completed",
+  "secs": 11,
+  "calls": 4,
+  "tools": [
+   "k8s_describe_resource",
+   "k8s_get_events",
+   "k8s_get_resources"
+  ],
+  "question": "Why is the deployment api in namespace demo-broken not running?",
+  "first_line": "## What's wrong"
+ },
+ {
+  "id": "s02",
+  "agent": "cluster-troubleshooter",
+  "state": "completed",
+  "secs": 8,
+  "calls": 5,
+  "tools": [
+   "k8s_describe_resource",
+   "k8s_get_events",
+   "k8s_get_pod_logs",
+   "k8s_get_resources"
+  ],
+  "question": "Why does the pod of deployment worker in namespace demo-broken keep restarting? Quote the log line.",
+  "first_line": "## What's wrong"
+ },
+ {
+  "id": "s03",
+  "agent": "cluster-troubleshooter",
+  "state": "completed",
+  "secs": 12,
+  "calls": 5,
+  "tools": [
+   "k8s_describe_resource",
+   "k8s_get_pod_logs",
+   "k8s_get_resources"
+  ],
+  "question": "The pod of deployment cache in namespace demo-broken restarts every minute. What is happening to it?",
+  "first_line": "**What's wrong:** The `cache` container is being OOM-killed on start \u2014 it allocates 200MiB of memory but is capped at a 64Mi limit."
+ },
+ {
+  "id": "s04",
+  "agent": "cluster-troubleshooter",
+  "state": "completed",
+  "secs": 52,
+  "calls": 8,
+  "tools": [
+   "k8s_check_service_connectivity",
+   "k8s_get_events",
+   "k8s_get_resource_yaml",
+   "k8s_get_resources"
+  ],
+  "question": "The Service checkout in namespace demo-broken returns connection refused. Why?",
+  "first_line": "## 1. What's wrong"
+ },
+ {
+  "id": "s05",
+  "agent": "cluster-troubleshooter",
+  "state": "completed",
+  "secs": 5,
+  "calls": 4,
+  "tools": [
+   "k8s_describe_resource",
+   "k8s_get_events",
+   "k8s_get_resources"
+  ],
+  "question": "Why is the pod of deployment batch in namespace demo-broken Pending?",
+  "first_line": "**What's wrong:** Deployment `batch`'s pod is Pending because it requests **16 CPUs**, which no node in the cluster can satisfy."
+ },
+ {
+  "id": "s06",
+  "agent": "cluster-troubleshooter",
+  "state": "completed",
+  "secs": 9,
+  "calls": 2,
+  "tools": [
+   "k8s_get_events",
+   "k8s_get_resources"
+  ],
+  "question": "Which pods in namespace demo-broken are healthy, and which are not? One line each.",
+  "first_line": "**Healthy (4):**"
+ },
+ {
+  "id": "s12",
+  "agent": "incident-reporter",
+  "state": "completed",
+  "secs": 161,
+  "calls": 21,
+  "tools": [
+   "dns_lookup",
+   "http_check",
+   "k8s_describe_resource",
+   "k8s_get_events",
+   "k8s_get_pod_logs",
+   "k8s_get_resource_yaml",
+   "k8s_get_resources",
+   "tcp_connect"
+  ],
+  "question": "Write an incident report for namespace demo-broken.",
+  "first_line": "# Incident Report \u2014 namespace `demo-broken`"
+ },
+ {
+  "id": "s07",
+  "agent": "observability-analyst",
+  "state": "completed",
+  "secs": 30,
+  "calls": 9,
+  "tools": [
+   "datetime_get_current_time",
+   "k8s_get_resources",
+   "prometheus_query_range_tool",
+   "prometheus_query_tool"
+  ],
+  "question": "Which containers in namespace demo-broken restarted most in the last 30 minutes, and how many times?",
+  "first_line": "### PromQL Query Executed"
+ },
+ {
+  "id": "s08",
+  "agent": "observability-analyst",
+  "state": "completed",
+  "secs": 46,
+  "calls": 11,
+  "tools": [
+   "datetime_get_current_time",
+   "k8s_get_resources",
+   "prometheus_query_tool"
+  ],
+  "question": "How much CPU and memory is each node using right now, as a share of its capacity?",
+  "first_line": "### Overview of Cluster Nodes"
+ },
+ {
+  "id": "s09",
+  "agent": "observability-analyst",
+  "state": "completed",
+  "secs": 33,
+  "calls": 6,
+  "tools": [
+   "k8s_get_resources",
+   "list_datasources",
+   "prometheus_query_tool",
+   "search_dashboards"
+  ],
+  "question": "Which alert rules exist in Grafana, and are any of them firing?",
+  "first_line": "### Alert Rules & Alerting Status in Grafana / Cluster"
+ },
+ {
+  "id": "s10",
+  "agent": "release-manager",
+  "state": "completed",
+  "secs": 7,
+  "calls": 1,
+  "tools": [
+   "helm_list_releases"
+  ],
+  "question": "Which Helm releases are installed, in which namespaces, and what chart version is each?",
+  "first_line": "Here are the installed Helm releases:"
+ },
+ {
+  "id": "s11",
+  "agent": "runbook-assistant",
+  "state": "completed",
+  "secs": 35,
+  "calls": 9,
+  "tools": [
+   "fetch",
+   "k8s_describe_resource",
+   "k8s_get_events",
+   "k8s_get_pod_logs",
+   "k8s_get_resources",
+   "query_documentation"
+  ],
+  "question": "The pod of deployment cache in demo-broken is OOMKilled. Diagnose it and tell me what the Kubernetes documentation says about memory limits and OOMKilled.",
+  "first_line": "## Diagnosis"
+ }
+]

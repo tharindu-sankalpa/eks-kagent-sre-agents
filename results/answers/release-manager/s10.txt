@@ -1,0 +1,21 @@
+Agent: release-manager
+Q: Which Helm releases are installed, in which namespaces, and what chart version is each?
+State: completed (7s)
+
+Here are the installed Helm releases:
+
+## Helm Releases
+
+| Release | Namespace | Chart Version | App Version | Status |
+|---------|-----------|---------------|-------------|--------|
+| **kagent** | kagent | kagent-**0.9.10** | — | deployed |
+| **kagent-crds** | kagent | kagent-crds-**0.9.10** | — | deployed |
+| **prometheus** | monitoring | kube-prometheus-stack-**83.6.0** | v0.90.1 | deployed |
+
+### Summary
+- **2 namespaces** in use: `kagent` and `monitoring`
+- **3 total releases**, all in `deployed` status
+- The `kagent` namespace holds the kagent platform (app + CRDs), both at version **0.9.10**
+- The `monitoring` namespace holds the Prometheus observability stack (kube-prometheus-stack **83.6.0**, app v0.90.1)
+
+All releases are healthy and successfully deployed. Note that per my operating rules, I don't modify anything in the `kagent` or `kube-system` namespaces.

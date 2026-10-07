@@ -1,0 +1,52 @@
+Agent: runbook-assistant
+Q: The pod of deployment cache in demo-broken is OOMKilled. Diagnose it and tell me what the Kubernetes documentation says about memory limits and OOMKilled.
+State: completed (35s)
+
+## Diagnosis
+
+The `cache` pod in `demo-broken` is OOMKilled because the container tries to allocate more memory than its limit allows.
+
+| Item | Finding |
+|---|---|
+| Pod | `cache-7d9bbbd4cc-kr5sx`, status `CrashLoopBackOff`, 44 restarts |
+| Last state | `Terminated`, Reason `OOMKilled`, Exit Code `137` |
+| Memory limit and request | Limit `64Mi`, request `32Mi` (QoS class Burstable) |
+| Command | `stress --vm 1 --vm-bytes 200M --vm-hang 0` |
+| Logs | `stress: info: [1] dispatching hogs: 0 cpu, 0 io, 1 vm, 0 hdd` (nothing after that, because the process is killed) |
+| Events | Repeated `BackOff` ("Back-off restarting failed container cache…"). The image pulls fine, so this isn't an image problem. |
+
+**Root cause:** The container is configured to allocate 200M (`--vm-bytes 200M`), but its memory limit is 64Mi. The kernel kills it almost immediately each time it starts, and the kubelet then backs off between restarts. The cause is the deployment spec, not a leak or a node problem.
+
+The other pods in this namespace have unrelated problems. `api` has a bad image tag (`ImagePullBackOff`), `batch` can't be scheduled (insufficient CPU), and `worker` is in `CrashLoopBackOff`. I haven't investigated those.
+
+## What the Kubernetes documentation says
+
+I relied on "Resource Management for Pods and Containers": https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+
+**How limits are enforced:**
+> "When you specify a resource limit for a container, the kubelet enforces those limits so that the running container is not allowed to use more of that resource than the limit you set."
+
+> "memory limits are enforced by the kernel with out of memory (OOM) kills. When a container uses more than its memory limit, the kernel may terminate it. However, terminations only happen when the kernel detects memory pressure. Thus, a container that over allocates memory may not be immediately killed. This means memory limits are enforced reactively."
+
+**On requests versus limits:**
+> "...it's possible (and allowed) for a container to use more resource than its request for that resource specifies."
+
+Only the limit (64Mi) causes the kill. The 32Mi request only affects scheduling.
+
+**The "My container is terminated" section**, which matches your case (`Last State: Terminated`, `Reason: OOMKilled`, `Exit Code: 137`):
+> "To check whether a container is being killed because it is hitting a resource limit, call `kubectl describe pod` on the Pod of interest…"
+
+> "The OOMKilled reason shows that the container tried to use more memory than its limit."
+
+> "Your next step might be to check the application code for a memory leak. If you find that the application is behaving how you expect, consider setting a higher memory limit (and possibly request) for that container."
+
+## Recommended fix
+
+I can't change the cluster, so you'd need to make this change yourself. Choose one of these:
+
+- **If 200M is intended** (the `stress` image exists to generate load): raise the memory limit above the workload's real need. For example, set the limit to about `256Mi` and the request to about `200Mi`.
+- **If the 64Mi limit is intended:** lower `--vm-bytes` to something that fits under it, such as `32M`.
+
+The documentation doesn't give specific numbers. Its guidance is to check whether the application behaves as expected, and if so, raise the limit and possibly the request.
+
+**Note:** My `query_documentation` tool failed because its embeddings API key is missing, so I fetched the pages from kubernetes.io directly. The quotes above come from those fetched pages.

@@ -1,0 +1,23 @@
+Agent: cluster-troubleshooter
+Q: Which pods in namespace demo-broken are healthy, and which are not? One line each.
+State: completed (9s)
+
+**Healthy (4):**
+
+| Pod | Status |
+|---|---|
+| `web-894868994-b9gmr` | Running 1/1, 0 restarts |
+| `web-894868994-c6g99` | Running 1/1, 0 restarts |
+| `web-894868994-qm2bv` | Running 1/1, 0 restarts |
+| `batch-584bc7b947-t59cn` | Pending |
+
+**Not healthy (4):**
+
+| Pod | Status | Evidence |
+|---|---|---|
+| `api-74dd9997fd-cfx82` | ImagePullBackOff | `Failed to pull image "nginx:1.99.99-does-not-exist": ... not found` |
+| `batch-584bc7b947-t59cn` | Pending | `0/2 nodes are available: 2 Insufficient cpu... Preemption is not helpful for scheduling` |
+| `cache-7d9bbbd4cc-kr5sx` | CrashLoopBackOff | 43 restarts; `Back-off restarting failed container cache` |
+| `worker-59c46dcdc4-mtt5x` | CrashLoopBackOff | 43 restarts; `Back-off restarting failed container worker` |
+
+Summary: 4 of 7 pods are unhealthy — the `web` deployment is fully up; `api` has a bad image tag (fix: `nginx:1.27`), `batch` can't schedule (CPU requests too high for 2 nodes), and `cache`/`worker` are crash-looping (container command/exit issue — would need `kubectl logs` to pin the exact cause). I can't change the cluster; the `sre-operator` agent can apply these fixes.

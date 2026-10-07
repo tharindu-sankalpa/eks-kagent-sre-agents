@@ -1,0 +1,39 @@
+Agent: sre-orchestrator
+Q: Is the cluster under CPU or memory pressure right now, and is anything in demo-broken restarting because of it?
+State: completed (78s, streamed)
+
+**The cluster is not under CPU or memory pressure. Two pods in demo-broken are restarting, but only one of them is restarting because of memory, and that is a limit set too low for the workload.**
+
+## Cluster pressure
+- **Node CPU:** about 4.7% on `ip-192-168-79-101` and about 7.6% on `ip-192-168-121-33`.
+- **Node memory:** about 15.9% on `ip-192-168-79-101` and about 17.4% on `ip-192-168-121-33`.
+- **Node conditions:** MemoryPressure, DiskPressure and PIDPressure are all `false` on both nodes, and both are Ready. The observability analyst read this from metrics, and the troubleshooter confirmed it from the live node status.
+- **Requested capacity:** the nodes have about 35% and 39% of their CPU requested.
+- **Evictions:** there are no evicted pods anywhere in the cluster.
+
+## Restarts in demo-broken
+| Pod | Status | Restarts (last hour / total) | Cause |
+|---|---|---|---|
+| `cache-7d9bbbd4cc-kr5sx` | CrashLoopBackOff | 12 / 47 | OOMKilled (exit 137) |
+| `worker-59c46dcdc4-mtt5x` | CrashLoopBackOff | 12 / 47 | Application error (exit 1) |
+
+- **`cache`:** it runs `stress --vm 1 --vm-bytes 200M` with a 64Mi memory limit. The container allocates about 200MiB and the kernel kills it on every start. This is a per-container limit being hit, not node memory pressure.
+- **`worker`:** the troubleshooter's log quote is `config file /etc/worker/config.yaml not found`. The container deliberately exits 1, and there is no config volume mounted. This has nothing to do with resources.
+
+## Other unhealthy pods (not restarting)
+- **`api-74dd9997fd-cfx82`:** `ImagePullBackOff`. The image tag `nginx:1.99.99-does-not-exist` doesn't exist.
+- **`batch-584bc7b947-t59cn`:** `Pending` with `0/2 nodes are available: 2 Insufficient cpu`. The pod requests 16 CPUs, but each node has only 3.92 CPUs allocatable. This is one oversized request, not cluster-wide exhaustion.
+- **`web` (3 replicas):** healthy, with 0 restarts and about 4.4MiB memory each.
+
+## Fixes (not applied)
+You only asked for a diagnosis, so I made no changes. The troubleshooter proposed these:
+- **`cache`:** raise the memory limit above 200Mi, for example to 256Mi, with a 128Mi request.
+- **`worker`:** mount a ConfigMap containing `/etc/worker/config.yaml`, or correct the command.
+- **`api`:** set a valid image tag, for example `nginx:1.27`.
+- **`batch`:** lower the CPU request, for example to 500m.
+
+If you want any of these applied, tell me which. I'll pass them to the sre_operator, which will wait for your approval before each change.
+
+The troubleshooter also noticed that `kagent/release-manager-54659cc586-dv4rd` has the same bad-image-tag problem. That pod is outside demo-broken, and I haven't checked it further.
+
+**Specialists used:** observability_analyst for the metrics and cluster_troubleshooter for the live pod and node state. They agreed on every point.

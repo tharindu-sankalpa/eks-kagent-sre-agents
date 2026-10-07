@@ -1,0 +1,26 @@
+Agent: cluster-troubleshooter
+Q: The pod of deployment cache in namespace demo-broken restarts every minute. What is happening to it?
+State: completed (12s)
+
+**What's wrong:** The `cache` container is being OOM-killed on start — it allocates 200MiB of memory but is capped at a 64Mi limit.
+
+**Evidence** (from `kubectl describe pod cache-7d9bbbd4cc-kr5sx -n demo-broken`):
+- `Last State: Terminated`, `Reason: OOMKilled`, `Exit Code: 137`, `Restart Count: 43`
+- Command: `stress --vm 1 --vm-bytes 200M --vm-hang 0`
+- `Limits: memory: 64Mi` / `Requests: memory: 32Mi`
+- Event: `Warning BackOff 3m13s (x897 over 3h18m) kubelet spec.containers{cache}: Back-off restarting failed container cache`
+- Logs show only one line before dying: `stress: info: [1] dispatching hogs: 0 cpu, 0 io, 1 vm, 0 hdd`
+
+**Root cause:** A resource mismatch in the deployment spec. The container's command reserves 200Mi of virtual memory, but the pod's memory limit is 64Mi, so the kernel kills the process immediately every time (exit 137 = SIGKILL), producing the ~1-minute `CrashLoopBackOff` cycle.
+
+**Fix (one of, pick per intent):**
+- If the workload genuinely needs 200Mi — raise the limit in the `cache` Deployment's container spec:
+  ```
+  kubectl -n demo-broken set resources deployment/cache --limits=memory=256Mi --requests=memory=64Mi
+  ```
+- If 200M was a typo in the command — lower it in the manifest to fit under 64Mi:
+  ```yaml
+  args: ["--vm", "1", "--vm-bytes", "48M", "--vm-hang", "0"]
+  ```
+
+I'm read-only and can't apply this — the **sre-operator** agent can make the change. Note this namespace has other unrelated failures too (`api` ImagePullBackOff on `nginx:1.99.99-does-not-exist`, `batch` Pending, `worker` CrashLoopBackOff); tell me if you want those diagnosed as well.

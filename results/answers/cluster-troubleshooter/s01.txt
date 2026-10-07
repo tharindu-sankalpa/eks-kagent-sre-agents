@@ -1,0 +1,71 @@
+Agent: cluster-troubleshooter
+Q: Why is the deployment api in namespace demo-broken not running?
+State: completed (11s)
+
+## What's wrong
+
+The `api` pod can't start because its container image tag doesn't exist — the Deployment references `nginx:1.99.99-does-not-exist`, so every pull fails and the pod is stuck in `ImagePullBackOff` (0/1 replicas available).
+
+## Evidence
+
+From `kubectl describe pod api-74dd9997fd-cfx82 -n demo-broken`:
+
+```
+State:          Waiting
+  Reason:       ImagePullBackOff
+Image:          nginx:1.99.99-does-not-exist
+```
+
+Repeated kubelet event (854 occurrences over 3h18m):
+
+```
+Failed to pull image "nginx:1.99.99-does-not-exist": rpc error: code = NotFound
+desc = failed to pull and unpack image "docker.io/library/nginx:1.99.99-does-not-exist":
+failed to resolve reference "docker.io/library/nginx:1.99.99-does-not-exist":
+docker.io/library/nginx:1.99.99-does-not-exist: not found
+```
+
+Scheduling and node state are fine — `PodScheduled: True`, `Initialized: True` — so this is purely a registry/image reference problem, not a node or capacity issue.
+
+## Most likely root cause
+
+An invalid image tag was deployed (a typo/placeholder like `1.99.99-does-not-exist`). `nginx` has no such tag, so Docker Hub returns `NotFound`. The ReplicaSet keeps retrying with exponential back-off.
+
+## Fix
+
+Point the Deployment at a valid nginx tag, e.g.:
+
+```bash
+kubectl -n demo-broken set image deployment/api api=nginx:1.27
+```
+
+Or patch the manifest:
+
+```yaml
+spec:
+  template:
+    spec:
+      containers:
+      - name: api
+        image: nginx:1.27   # was nginx:1.99.99-does-not-exist
+```
+
+Then verify:
+
+```bash
+kubectl -n demo-broken rollout status deployment/api
+kubectl -n demo-broken get pods -l app=api
+```
+
+If the image is supposed to live in a private registry (ECR), the fix instead is the correct repository URL plus an `imagePullSecret` on the pod spec — I can check the ServiceAccount/secret wiring if that's the case.
+
+⚠️ I'm read-only and can't apply this. The `sre-operator` agent can run the rollout/patch for you.
+
+### Also failing in this namespace (not the api)
+| Pod | Status | Cause |
+|---|---|---|
+| `batch-584bc7b947-t59cn` | Pending | `0/2 nodes are available: 2 Insufficient cpu` |
+| `cache-7d9bbbd4cc-kr5sx` | CrashLoopBackOff (43 restarts) | container `cache` exits on start (`polinux/stress`) |
+| `worker-59c46dcdc4-mtt5x` | CrashLoopBackOff (43 restarts) | container `worker` exits on start (`busybox:1.36`) |
+
+Want me to dig into the `cache`/`worker` crash loops or the `batch` CPU shortage next?

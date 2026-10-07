@@ -1,0 +1,95 @@
+Agent: incident-reporter
+Q: Write an incident report for namespace demo-broken.
+State: completed (161s)
+
+# Incident Report — namespace `demo-broken`
+
+## 1. Summary
+
+- **`api`** (Deployment, 1/1 pods) is stuck in `ImagePullBackOff`: pod `api-74dd9997fd-cfx82` is `0/1` and never started.
+- **`batch`** (Deployment, 1/1 pods) is stuck `Pending`: pod `batch-584bc7b947-t59cn` is unschedulable.
+- **`cache`** (Deployment, 1/1 pods) is in `CrashLoopBackOff`: pod `cache-7d9bbbd4cc-kr5sx` is `0/1`, restarts `44 (3m23s ago)`, last termination `OOMKilled` (exit 137).
+- **`worker`** (Deployment, 1/1 pods) is in `CrashLoopBackOff`: pod `worker-59c46dcdc4-mtt5x` is `0/1`, restarts `44 (3m9s ago)`, last termination `Error` (exit 1).
+- **Service `checkout`** (ClusterIP `10.100.237.153`) has **no endpoints** — it refuses connections.
+- `web` (Deployment, 3/3) is healthy — all three pods `1/1 Running`, no restarts.
+
+## 2. Evidence
+
+**`api` — image pull failure** (event, count 875, `lastTimestamp 2026-10-07T09:32:13Z`):
+> `Back-off pulling image "nginx:1.99.99-does-not-exist": ErrImagePull: rpc error: code = NotFound desc = failed to pull and unpack image "docker.io/library/nginx:1.99.99-does-not-exist": failed to resolve reference "docker.io/library/nginx:1.99.99-does-not-exist": docker.io/library/nginx:1.99.99-does-not-exist: not found`
+
+Pod status: `state.waiting.reason: ImagePullBackOff`, `restartCount: 0`; RS `api-74dd9997fd` image `nginx:1.99.99-does-not-exist`.
+
+**`batch` — unschedulable** (event `FailedScheduling`, x45 over 3h24m):
+> `0/2 nodes are available: 2 Insufficient cpu. no new claims to deallocate, preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling.`
+
+Pod spec requests `cpu: "16"`. Node list shows only 2 nodes, both `Ready`.
+
+**`cache` — OOMKilled** (pod describe):
+> `Last State: Terminated, Reason: OOMKilled, Exit Code: 137`
+> `Limits: memory: 64Mi` / `Requests: memory: 32Mi`
+
+Container command: `stress --vm 1 --vm-bytes 200M --vm-hang 0`; last log line: `stress: info: [1] dispatching hogs: 0 cpu, 0 io, 1 vm, 0 hdd`. Event: `Back-off restarting failed container cache ... (x920 over 3h22m)`.
+
+**`worker` — application exit 1** (pod describe):
+> `Last State: Terminated, Reason: Error, Exit Code: 1`
+
+Container command / only log line: `config file /etc/worker/config.yaml not found`. Event: `Back-off restarting failed container worker ... (x926 over 3h22m)`.
+
+**Service `checkout` — no endpoints:**
+```
+NAME       ENDPOINTS   AGE
+checkout   <none>      3h22m
+```
+DNS resolves (`resolved: true, addresses: ["10.100.237.153"]`), but from inside the cluster:
+- `tcp_connect checkout.demo-broken.svc.cluster.local:80` → `connected: false, error: "[Errno 111] Connection refused"`
+- `http_check http://checkout.demo-broken.svc.cluster.local:80/` → `ok: false, error: "ConnectError: [Errno 111] Connection refused"`
+
+Service spec: `selector: {app: checkout}`, `ports: [{port: 80, targetPort: 80}]`. The namespace contains **no** pod, ReplicaSet or Deployment labelled `app=checkout` (pods are labelled `app=api`, `app=batch`, `app=cache`, `app=web`, `app=worker`).
+
+## 3. Root cause
+
+- **`api`** — The Deployment manifest references a non-existent image tag `nginx:1.99.99-does-not-exist`. The registry returns `not found`, so the image can never be pulled; kubelet backs off forever.
+- **`batch`** — An invalid resource request: `cpu: "16"` means 16 CPU *cores* (not 16 millicores, which would be `16m`). Neither of the two nodes has 16 free cores, and preemption cannot help, so the scheduler leaves the pod `Pending`.
+- **`cache`** — The container is asked to allocate 200 MB (`--vm-bytes 200M`) but its memory limit is `64Mi`. The kernel OOM-kills the process immediately after start (exit 137); the pod loops in `CrashLoopBackOff`.
+- **`worker`** — The container's own entrypoint is `/bin/sh -c "echo 'config file /etc/worker/config.yaml not found'; exit 1"`: it deliberately prints that message and exits 1. The required config file is not mounted/provided to the container, so the process fails on every restart.
+- **`checkout`** — Selector mismatch: the Service selects `app=checkout`, but no workload in the namespace carries that label. With an empty EndpointSlice, kube-proxy programs no backends, so the ClusterIP resolves but every connection to port 80 is refused.
+
+## 4. Fix
+
+**`api`** — point the Deployment at an image tag that exists (registry-side note: the tag was never published):
+```
+kubectl -n demo-broken set image deployment/api api=nginx:1.27
+```
+
+**`batch`** — correct the CPU request from 16 cores to a realistic value:
+```
+kubectl -n demo-broken patch deployment batch --type=json \
+  -p='[{"op":"replace","path":"/spec/template/spec/containers/0/resources/requests/cpu","value":"100m"}]'
+```
+
+**`cache`** — either raise the limit above the workload's allocation or lower the demand:
+```
+kubectl -n demo-broken set resources deployment/cache --limits=memory=512Mi
+# or lower the demand in the manifest: --vm-bytes 32M with the existing 64Mi limit
+```
+
+**`worker`** — provide the missing configuration, e.g. mount it from a ConfigMap named `worker-config` and remove the failing placeholder command:
+```
+kubectl -n demo-broken create configmap worker-config --from-file=config.yaml=./config.yaml
+kubectl -n demo-broken patch deployment worker --type=json -p='[
+  {"op":"add","path":"/spec/template/spec/volumes","value":[{"name":"config","configMap":{"name":"worker-config"}}]},
+  {"op":"add","path":"/spec/template/spec/containers/0/volumeMounts","value":[{"name":"config","mountPath":"/etc/worker","readOnly":true}]}
+]'
+```
+(The current command must also be replaced with the real worker entrypoint — as written it always exits 1 regardless of the file.)
+
+**`checkout`** — make the selector match the workload that should serve it. If `web` (`app=web`, 3/3 Running) is the intended backend:
+```
+kubectl -n demo-broken patch service checkout -p '{"spec":{"selector":{"app":"web"}}}'
+```
+Otherwise deploy the missing `app=checkout` workload. Verify afterwards:
+```
+kubectl -n demo-broken get endpoints checkout
+```
+which should list the pod IPs on port 80.

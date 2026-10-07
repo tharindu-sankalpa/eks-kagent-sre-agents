@@ -1,0 +1,64 @@
+Agent: observability-analyst
+Q: Which alert rules exist in Grafana, and are any of them firing?
+State: completed (33s)
+
+### Alert Rules & Alerting Status in Grafana / Cluster
+
+In this Amazon EKS cluster, Grafana is connected to the in-cluster Prometheus (`http://prometheus-kube-prometheus-prometheus.monitoring:9090`), which evaluates alert rules defined via Prometheus Operator (`PrometheusRule` custom resources). There are no native Grafana-managed alert rules configured; alerting is driven by Prometheus.
+
+---
+
+### 1. Alert Rule Groups Configured
+
+There are **30 `PrometheusRule` rule definitions** configured in the cluster (in the `monitoring` namespace) providing standard Kubernetes, node, and Prometheus alerting coverage:
+
+* `prometheus-kube-prometheus-kubernetes-apps` (Deployment rollouts, replica mismatches, crashlooping, pod readiness)
+* `prometheus-kube-prometheus-kubernetes-resources` (CPU/Memory overcommit, resource saturation)
+* `prometheus-kube-prometheus-kubernetes-system` (System daemon issues)
+* `prometheus-kube-prometheus-kubernetes-system-apiserver` & `kubernetes-system-kubelet`
+* `prometheus-kube-prometheus-node-exporter` & `node.rules` (Node filesystem, disk, network, memory)
+* `prometheus-kube-prometheus-prometheus` (Prometheus health, alertmanager connectivity)
+* `prometheus-kube-prometheus-alertmanager.rules`
+* `prometheus-kube-prometheus-kube-state-metrics`
+
+---
+
+### 2. Active Alert Status
+
+#### **PromQL Query Executed:**
+```promql
+ALERTS
+```
+
+#### **Raw Results:**
+
+| Alert Name | State | Namespace | Pod / Resource | Severity | Details / Value |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **`KubePodCrashLooping`** | `firing` | `demo-broken` | `pod/worker-59c46dcdc4-mtt5x` (container: `worker`) | `warning` | 1 |
+| **`KubePodCrashLooping`** | `firing` | `demo-broken` | `pod/cache-7d9bbbd4cc-kr5sx` (container: `cache`) | `warning` | 1 |
+| **`KubePodNotReady`** | `firing` | `demo-broken` | `pod/batch-584bc7b947-t59cn` | `warning` | 1 |
+| **`KubePodNotReady`** | `firing` | `demo-broken` | `pod/api-74dd9997fd-cfx82` | `warning` | 1 |
+| **`KubeDeploymentReplicasMismatch`** | `firing` | `demo-broken` | `deployment/api` | `warning` | 1 |
+| **`KubeDeploymentReplicasMismatch`** | `firing` | `demo-broken` | `deployment/batch` | `warning` | 1 |
+| **`KubeDeploymentReplicasMismatch`** | `firing` | `demo-broken` | `deployment/cache` | `warning` | 1 |
+| **`KubeDeploymentReplicasMismatch`** | `firing` | `demo-broken` | `deployment/worker` | `warning` | 1 |
+| **`KubeDeploymentRolloutStuck`** | `firing` | `demo-broken` | `deployment/api` | `warning` | 1 |
+| **`KubeDeploymentRolloutStuck`** | `firing` | `demo-broken` | `deployment/batch` | `warning` | 1 |
+| **`KubeCPUOvercommit`** | `firing` | — | Cluster-level CPU requests exceed capacity | `warning` | 1 |
+| **`PrometheusNotConnectedToAlertmanagers`** | `firing` | `monitoring` | `prometheus-kube-prometheus-prometheus-0` | `warning` | 1 |
+| **`Watchdog`** | `firing` | — | Expected heartbeat alert | `none` | 1 |
+| **`KubeContainerWaiting`** | `pending` | `demo-broken` | `pod/api-74dd9997fd-cfx82` (`ImagePullBackOff`) | `warning` | 1 |
+| **`KubeContainerWaiting`** | `pending` | `kagent` | `pod/release-manager-54659cc586-dv4rd` (`ImagePullBackOff`) | `warning` | 1 |
+| **`KubePodNotReady`** | `pending` | `kagent` | `pod/release-manager-54659cc586-dv4rd` | `warning` | 1 |
+
+---
+
+### Interpretation & Summary
+
+1. **Active Application Failures (`demo-broken` namespace):**
+   * **CrashLooping**: `worker` and `cache` pods are failing repeatedly.
+   * **Stuck Rollouts & Unready Pods**: `api` (ImagePullBackOff) and `batch` (Pending scheduling) have exceeded progress deadlines, causing replica mismatches across all 4 deployments (`api`, `batch`, `cache`, `worker`).
+2. **Infrastructure / Monitoring Warnings:**
+   * **`KubeCPUOvercommit`**: The sum of pod CPU requests exceeds node allocatable CPU capacity.
+   * **`PrometheusNotConnectedToAlertmanagers`**: Prometheus is not configured to ship alerts to an external Alertmanager instance.
+   * **`Watchdog`**: Standard always-firing heartbeat alert ensuring the alert evaluation pipeline is functioning.

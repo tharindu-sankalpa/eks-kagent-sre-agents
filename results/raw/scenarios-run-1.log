@@ -1,0 +1,14 @@
+cluster-troubleshooter/s01  completed  11s
+cluster-troubleshooter/s02  completed  8s
+cluster-troubleshooter/s03  completed  12s
+cluster-troubleshooter/s04  completed  52s
+cluster-troubleshooter/s05  completed  5s
+cluster-troubleshooter/s06  completed  9s
+observability-analyst/s07  completed  30s
+observability-analyst/s08  completed  46s
+observability-analyst/s09  completed  33s
+release-manager/s10  completed  7s
+runbook-assistant/s11  completed  35s
+incident-reporter/s12  completed  161s
+sre-orchestrator/s13  failed to send HTTP request: Post "http://sre-orchestrator.kagent:8080": context deadline exceeded (Client.Timeout exceeded while awaiting headers)  180s
+./scripts/ask-agent.sh: line 22: 22007 Terminated: 15          curl -s -m 600 -X POST "$KAGENT/api/a2a/$NS/$agent/" -H 'Content-Type: application/json' -d "$body" > "$out/$id.json"

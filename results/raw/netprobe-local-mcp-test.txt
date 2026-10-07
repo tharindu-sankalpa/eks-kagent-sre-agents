@@ -1,0 +1,37 @@
+{
+ "tools": [
+  {
+   "name": "tcp_connect",
+   "args": [
+    "host",
+    "port",
+    "timeout_seconds"
+   ]
+  },
+  {
+   "name": "http_check",
+   "args": [
+    "url",
+    "timeout_seconds"
+   ]
+  },
+  {
+   "name": "dns_lookup",
+   "args": [
+    "hostname"
+   ]
+  },
+  {
+   "name": "tls_cert_expiry",
+   "args": [
+    "host",
+    "port",
+    "timeout_seconds"
+   ]
+  }
+ ]
+}
+dns_lookup -> {"resolved":true,"addresses":["104.20.23.154","172.66.147.243"],"canonical_name":"example.com"}
+http_check -> {"ok":true,"status_code":200,"latency_ms":68.2,"final_url":"https://example.com/","server":"cloudflare","content_length":577}
+tcp_connect -> {"connected":true,"connect_ms":9.5,"peer":["172.66.147.243",443]}
+tls_cert_expiry -> {"valid_now":true,"days_remaining":79,"not_after":"2026-12-25T22:56:35+00:00","issuer":{"countryName":"US","organizationName":"SSL Corporation","commonName":"Cloudflare TLS Issuing ECC CA 3"},"subject":{"commonName":"example.com"},"san":["example.com","*.example.com"],"tls_version":"TLSv1.3"}

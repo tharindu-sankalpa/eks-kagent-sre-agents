@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","id":"1","error":{"code":-32603,"message":"failed to send HTTP request: Post \"http://sre-orchestrator.kagent:8080\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)","data":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","domain":"a2a-protocol.org","metadata":{"timestamp":"2026-10-07T09:39:54Z"},"reason":"INTERNAL_ERROR"}]}}
