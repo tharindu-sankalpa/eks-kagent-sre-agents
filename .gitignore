@@ -1,0 +1,15 @@
+# secrets and local state
+.env
+.kube/
+# upstream source checkouts used as the source of truth (not redistributed here)
+repos/
+.DS_Store
+# unmasked screenshots and uncropped diagrams
+.screenshots-original/
+.diagrams-original/
+
+# Python build artefacts (byo/)
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
