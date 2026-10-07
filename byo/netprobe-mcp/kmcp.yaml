@@ -1,0 +1,21 @@
+name: netprobe-mcp
+framework: fastmcp-python
+version: 0.1.0
+description: 'Network probes for SRE agents: HTTP check, DNS lookup, TCP connect, TLS certificate expiry'
+secrets:
+    local:
+        enabled: false
+        provider: env
+        file: .env.local
+    production:
+        enabled: false
+        provider: kubernetes
+        secretName: netprobe-mcp-secrets-production
+        namespace: kagent
+    staging:
+        enabled: false
+        provider: kubernetes
+        secretName: netprobe-mcp-secrets-staging
+        namespace: kagent
+created_at: 2026-10-07T11:25:19.113048+05:30
+updated_at: 2026-10-07T11:25:19.11552+05:30

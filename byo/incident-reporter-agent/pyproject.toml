@@ -1,0 +1,15 @@
+[project]
+name = "incident-reporter-agent"
+version = "0.1.0"
+description = "A bring-your-own kagent agent: a plain while-loop ReAct agent that writes an incident report for a namespace, served over A2A."
+requires-python = ">=3.12"
+dependencies = [
+    "a2a-sdk[http-server]>=0.3.23,<1",
+    "openai>=1.60,<4",
+    "mcp>=1.10,<2",
+    "httpx>=0.28",
+    "uvicorn>=0.30",
+]
+
+[tool.uv]
+dev-dependencies = ["pytest>=8"]
