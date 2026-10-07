@@ -1,0 +1,2756 @@
+{
+  "info": {
+    "name": "kagent on EKS: controller API, tool server, agents",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "The kagent controller's HTTP API (port 8083), the built-in tool server's MCP endpoint (port 8084), and the agents of this build, all through kubectl port-forwards:\n\n    kubectl -n kagent port-forward svc/kagent-controller 8083:8083\n    kubectl -n kagent port-forward svc/kagent-tools 8084:8084\n    kubectl -n kagent port-forward svc/netprobe-mcp 3002:3000\n\nAuthentication: the controller runs in its default `unsecure` mode. It takes the user from `?user_id=` or the `X-User-Id` header and otherwise uses `admin@kagent.dev`. No request is rejected. Sessions are filtered by that user.\n\nRoutes were read from kagent v0.9.10 `go/core/internal/httpserver/server.go`. Most responses are wrapped as `{error, data, message}`."
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8083",
+      "description": "kagent controller port-forward"
+    },
+    {
+      "key": "tools_url",
+      "value": "http://127.0.0.1:8084",
+      "description": "kagent-tools port-forward"
+    },
+    {
+      "key": "ns",
+      "value": "kagent",
+      "description": "namespace of the agents"
+    },
+    {
+      "key": "agent",
+      "value": "cluster-troubleshooter",
+      "description": "agent name for the A2A and session requests"
+    },
+    {
+      "key": "user_id",
+      "value": "admin@kagent.dev",
+      "description": "user the controller attributes sessions to"
+    },
+    {
+      "key": "session_id",
+      "value": "",
+      "description": "set by 'create session' and by A2A responses (= A2A contextId)"
+    },
+    {
+      "key": "task_id",
+      "value": "",
+      "description": "set by A2A responses"
+    },
+    {
+      "key": "mcp_session_id",
+      "value": "",
+      "description": "Mcp-Session-Id from the controller /mcp initialize"
+    },
+    {
+      "key": "tools_session_id",
+      "value": "",
+      "description": "Mcp-Session-Id from the tool server initialize"
+    },
+    {
+      "key": "netprobe_url",
+      "value": "http://127.0.0.1:3002",
+      "description": "netprobe-mcp port-forward (svc/netprobe-mcp 3002:3000)"
+    },
+    {
+      "key": "netprobe_session_id",
+      "value": "",
+      "description": "Mcp-Session-Id from the netprobe initialize"
+    }
+  ],
+  "item": [
+    {
+      "name": "1 · System",
+      "description": "Routes that need no body. /health and /version skip authentication.",
+      "item": [
+        {
+          "name": "health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "`{error:false, data:{status:'OK'}}`. handlers/health.go"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "version",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/version",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "version"
+              ]
+            },
+            "description": "`{kagent_version, git_commit, build_date}`; not wrapped. server.go:219"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "current user (/api/me)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{user_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "me"
+              ]
+            },
+            "description": "In unsecure mode returns `{sub: '<user id>'}` for the resolved user. Try it with `?user_id=someone@example.com` to see the fallback logic."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "namespaces",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/namespaces",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "namespaces"
+              ]
+            },
+            "description": "`[{name, status}]` for every namespace the controller can see."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 · Model configs",
+      "description": "A ModelConfig is kagent's 'model an agent can use'. Every one in this build points at OpenRouter through its OpenAI-compatible API and reads the key from the Secret `kagent-openrouter`. handlers/modelconfig.go",
+      "item": [
+        {
+          "name": "list model configs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/modelconfigs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "modelconfigs"
+              ]
+            },
+            "description": "`[{ref: 'ns/name', spec, status}]`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "get one model config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/modelconfigs/{{ns}}/grok-4-7",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "modelconfigs",
+                "{{ns}}",
+                "grok-4-7"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "create model config (API instead of YAML)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/modelconfigs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "modelconfigs"
+              ]
+            },
+            "description": "Same result as `kubectl apply` of a ModelConfig. `ref` is `namespace/name`. Optional `apiKey` creates the Secret for you; here the existing Secret is referenced instead. `defaultHeaders` are sent on every LLM request (OpenRouter uses HTTP-Referer and X-Title for attribution). Returns 201.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{ns}}/grok-4-7-from-api\",\n  \"spec\": {\n    \"provider\": \"OpenAI\",\n    \"model\": \"x-ai/grok-4.7\",\n    \"apiKeySecret\": \"kagent-openrouter\",\n    \"apiKeySecretKey\": \"OPENROUTER_API_KEY\",\n    \"openAI\": {\n      \"baseUrl\": \"https://openrouter.ai/api/v1\"\n    },\n    \"defaultHeaders\": {\n      \"HTTP-Referer\": \"https://github.com/tharindu-sankalpa/eks-kagent-sre-agents\",\n      \"X-Title\": \"kagent SRE agents\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "update model config",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/modelconfigs/{{ns}}/grok-4-7-from-api",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "modelconfigs",
+                "{{ns}}",
+                "grok-4-7-from-api"
+              ]
+            },
+            "description": "Body is `{spec, apiKey?, secrets?}`; the whole spec is replaced.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"spec\": {\n    \"provider\": \"OpenAI\",\n    \"model\": \"x-ai/grok-4.7\",\n    \"apiKeySecret\": \"kagent-openrouter\",\n    \"apiKeySecretKey\": \"OPENROUTER_API_KEY\",\n    \"openAI\": {\n      \"baseUrl\": \"https://openrouter.ai/api/v1\",\n      \"temperature\": \"0.2\"\n    },\n    \"defaultHeaders\": {\n      \"HTTP-Referer\": \"https://github.com/tharindu-sankalpa/eks-kagent-sre-agents\",\n      \"X-Title\": \"kagent SRE agents\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "delete model config",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/modelconfigs/{{ns}}/grok-4-7-from-api",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "modelconfigs",
+                "{{ns}}",
+                "grok-4-7-from-api"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "supported providers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/modelproviderconfigs/models",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "modelproviderconfigs",
+                "models"
+              ]
+            },
+            "description": "`[{name, type, requiredParams, optionalParams}]`: the providers kagent knows and what each needs."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "known models per provider",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/models",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "models"
+              ]
+            },
+            "description": "A hardcoded provider→models map used by the UI's dropdowns (handlers/models.go). OpenRouter models are not in it; any model id works in a ModelConfig regardless."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 · Tool servers and tools",
+      "description": "Tool sources kagent knows: RemoteMCPServer resources (a URL), MCPServer resources (run by kmcp), and Services labelled `kagent.dev/mcp-service: \"true\"`. The controller connects to each, lists its tools and stores them. handlers/toolservers.go, handlers/tools.go",
+      "item": [
+        {
+          "name": "list tool servers with their discovered tools",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/toolservers",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "toolservers"
+              ]
+            },
+            "description": "`[{ref, groupKind, discoveredTools: [{name, description}]}]`. The built-in server `kagent/kagent-tool-server` lists 124 tools."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "list all tools (flat)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tools",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tools"
+              ]
+            },
+            "description": "`[{id, server_name, group_kind, description, ...}]`. `id` is the MCP tool name. No input schema here; get that from the server itself (folder 4)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "tool server types",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/toolservertypes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "toolservertypes"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "register a RemoteMCPServer through the API",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/toolservers",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "toolservers"
+              ]
+            },
+            "description": "Body: `{type, remoteMCPServer | mcpServer, secrets?}`. Equivalent to applying the RemoteMCPServer YAML.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"RemoteMCPServer\",\n  \"remoteMCPServer\": {\n    \"apiVersion\": \"kagent.dev/v1alpha2\",\n    \"kind\": \"RemoteMCPServer\",\n    \"metadata\": {\n      \"name\": \"fetch-via-api\",\n      \"namespace\": \"{{ns}}\"\n    },\n    \"spec\": {\n      \"description\": \"The kmcp-run fetch server, registered a second time through the API\",\n      \"protocol\": \"STREAMABLE_HTTP\",\n      \"url\": \"http://fetch.kagent:3000/mcp\",\n      \"timeout\": \"30s\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "delete the API-registered tool server",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/toolservers/{{ns}}/fetch-via-api",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "toolservers",
+                "{{ns}}",
+                "fetch-via-api"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 · Call the built-in tools directly (no LLM)",
+      "description": "`kubectl -n kagent port-forward svc/kagent-tools 8084:8084`. The tool server is a plain MCP server over streamable HTTP, with no authentication. These requests are what an agent's runtime does when the model asks for a tool. Argument names are from `tools/list`; check them there if a call returns an error, since the tool server (kagent-tools 0.2.1) is not part of the kagent source.",
+      "item": [
+        {
+          "name": "1 · initialize",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              }
+            ],
+            "url": {
+              "raw": "{{tools_url}}/mcp",
+              "host": [
+                "{{tools_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "Standard MCP handshake against the tool server itself (`kagent-tools`, port 8084). The test script stores the `Mcp-Session-Id` response header for the following requests.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"initialize\",\n  \"params\": {\n    \"protocolVersion\": \"2025-03-26\",\n    \"capabilities\": {},\n    \"clientInfo\": {\n      \"name\": \"postman\",\n      \"version\": \"1.0\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);",
+                  "const h = pm.response.headers.get('mcp-session-id');",
+                  "if (h) { pm.collectionVariables.set('tools_session_id', h); console.log('session', h); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 · notifications/initialized",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Mcp-Session-Id",
+                "value": "{{tools_session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{tools_url}}/mcp",
+              "host": [
+                "{{tools_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "Second half of the handshake. Expect HTTP 202 with an empty body.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"notifications/initialized\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 · tools/list (124 tools with input schemas)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Mcp-Session-Id",
+                "value": "{{tools_session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{tools_url}}/mcp",
+              "host": [
+                "{{tools_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "Every tool with its description and `inputSchema`. This is where the argument names for the calls below come from.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 2,\n  \"method\": \"tools/list\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4 · tools/call · k8s_get_resources · all pods",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Mcp-Session-Id",
+                "value": "{{tools_session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{tools_url}}/mcp",
+              "host": [
+                "{{tools_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "The same data `kubectl get pods -A -o wide` returns, as text.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 3,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"k8s_get_resources\",\n    \"arguments\": {\n      \"resource_type\": \"pods\",\n      \"all_namespaces\": true,\n      \"output\": \"wide\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5 · tools/call · k8s_get_events · demo-broken",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Mcp-Session-Id",
+                "value": "{{tools_session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{tools_url}}/mcp",
+              "host": [
+                "{{tools_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "Events of the namespace with the deliberately broken workloads.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 4,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"k8s_get_events\",\n    \"arguments\": {\n      \"namespace\": \"demo-broken\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6 · tools/call · k8s_describe_resource · deployment api",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Mcp-Session-Id",
+                "value": "{{tools_session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{tools_url}}/mcp",
+              "host": [
+                "{{tools_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 5,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"k8s_describe_resource\",\n    \"arguments\": {\n      \"resource_type\": \"deployment\",\n      \"resource_name\": \"api\",\n      \"namespace\": \"demo-broken\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7 · tools/call · k8s_get_pod_logs · worker",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Mcp-Session-Id",
+                "value": "{{tools_session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{tools_url}}/mcp",
+              "host": [
+                "{{tools_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "Replace the pod name with one from the first call.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 6,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"k8s_get_pod_logs\",\n    \"arguments\": {\n      \"pod_name\": \"<a worker pod name from the pods call>\",\n      \"namespace\": \"demo-broken\",\n      \"tail_lines\": 20\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8 · tools/call · helm_list_releases",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Mcp-Session-Id",
+                "value": "{{tools_session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{tools_url}}/mcp",
+              "host": [
+                "{{tools_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "Helm releases in the cluster.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 7,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"helm_list_releases\",\n    \"arguments\": {\n      \"all_namespaces\": true\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "9 · tools/call · prometheus_query_tool · pod restarts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Mcp-Session-Id",
+                "value": "{{tools_session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{tools_url}}/mcp",
+              "host": [
+                "{{tools_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "Needs the kube-prometheus-stack from setup guide step 8. The tool rejects comparison operators (`>`, `<`, `==`) as \"potentially dangerous characters\", so filter with topk() instead of `> 0`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 8,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"prometheus_query_tool\",\n    \"arguments\": {\n      \"prometheus_url\": \"http://prometheus-kube-prometheus-prometheus.monitoring:9090\",\n      \"query\": \"topk(5, sum by (namespace, pod) (kube_pod_container_status_restarts_total))\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 · tools/call · datetime_get_current_time",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Mcp-Session-Id",
+                "value": "{{tools_session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{tools_url}}/mcp",
+              "host": [
+                "{{tools_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 9,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"datetime_get_current_time\",\n    \"arguments\": {}\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 · tools/call · k8s_delete_resource · the agents do not have this tool",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Mcp-Session-Id",
+                "value": "{{tools_session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{tools_url}}/mcp",
+              "host": [
+                "{{tools_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "The tool server exposes 124 tools including this one and `shell`. No agent in this build is given them: `toolNames` on each Agent is the allow-list. Calling the server directly, as here, is not subject to that list.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 10,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"k8s_delete_resource\",\n    \"arguments\": {\n      \"resource_type\": \"pod\",\n      \"resource_name\": \"does-not-exist\",\n      \"namespace\": \"demo-broken\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4b · Call the bring-your-own MCP server directly",
+      "description": "Same handshake as folder 4, against the server built in byo/netprobe-mcp and deployed with kmcp (setup guide step 10).",
+      "item": [
+        {
+          "name": "1 · initialize",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              }
+            ],
+            "url": {
+              "raw": "{{netprobe_url}}/mcp",
+              "host": [
+                "{{netprobe_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "The bring-your-own MCP server from byo/netprobe-mcp, run by kmcp with the HTTP transport. `kubectl -n kagent port-forward svc/netprobe-mcp 3002:3000`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"initialize\",\n  \"params\": {\n    \"protocolVersion\": \"2025-03-26\",\n    \"capabilities\": {},\n    \"clientInfo\": {\n      \"name\": \"postman\",\n      \"version\": \"1.0\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);",
+                  "const h = pm.response.headers.get('mcp-session-id');",
+                  "if (h) { pm.collectionVariables.set('netprobe_session_id', h); console.log('session', h); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 · notifications/initialized",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Mcp-Session-Id",
+                "value": "{{netprobe_session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{netprobe_url}}/mcp",
+              "host": [
+                "{{netprobe_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"notifications/initialized\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 · tools/list (4 tools)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Mcp-Session-Id",
+                "value": "{{netprobe_session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{netprobe_url}}/mcp",
+              "host": [
+                "{{netprobe_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 2,\n  \"method\": \"tools/list\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4 · tools/call · dns_lookup · the broken Service still resolves",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Mcp-Session-Id",
+                "value": "{{netprobe_session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{netprobe_url}}/mcp",
+              "host": [
+                "{{netprobe_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "A ClusterIP Service resolves even with no endpoints: DNS is not the problem.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 3,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"dns_lookup\",\n    \"arguments\": {\n      \"hostname\": \"checkout.demo-broken.svc.cluster.local\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5 · tools/call · tcp_connect · but nothing answers on it",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Mcp-Session-Id",
+                "value": "{{netprobe_session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{netprobe_url}}/mcp",
+              "host": [
+                "{{netprobe_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "The selector matches no pod, so the connection fails. Together with the previous call this is the diagnosis.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 4,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"tcp_connect\",\n    \"arguments\": {\n      \"host\": \"checkout.demo-broken.svc.cluster.local\",\n      \"port\": 80\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6 · tools/call · http_check · a working Service",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Mcp-Session-Id",
+                "value": "{{netprobe_session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{netprobe_url}}/mcp",
+              "host": [
+                "{{netprobe_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "A probe from inside the cluster to a healthy Service.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 5,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"http_check\",\n    \"arguments\": {\n      \"url\": \"http://kagent-ui.kagent.svc.cluster.local:8080/\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7 · tools/call · tls_cert_expiry · a public host",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Mcp-Session-Id",
+                "value": "{{netprobe_session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{netprobe_url}}/mcp",
+              "host": [
+                "{{netprobe_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 6,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"tls_cert_expiry\",\n    \"arguments\": {\n      \"host\": \"example.com\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5 · Agents",
+      "description": "An Agent is one YAML resource: description, type (Declarative or BYO), model config, system message, tools. The API takes and returns the same object `kubectl` does. handlers/agents.go",
+      "item": [
+        {
+          "name": "list agents",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/agents?namespace={{ns}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "agents"
+              ],
+              "query": [
+                {
+                  "key": "namespace",
+                  "value": "{{ns}}"
+                }
+              ]
+            },
+            "description": "`[{id, agent: {spec, status...}, modelProvider, model, tools, deploymentReady, accepted}]`. `deploymentReady` and `accepted` are what the UI shows as the agent's health."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "get one agent",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/agents/{{ns}}/{{agent}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "agents",
+                "{{ns}}",
+                "{{agent}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "create an agent through the API",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/agents",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "agents"
+              ]
+            },
+            "description": "The body is a full `kagent.dev/v1alpha2` Agent object. The controller creates the Deployment and Service for it; `deploymentReady` turns true after about a minute. Returns 201.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"apiVersion\": \"kagent.dev/v1alpha2\",\n  \"kind\": \"Agent\",\n  \"metadata\": {\n    \"name\": \"node-reporter\",\n    \"namespace\": \"{{ns}}\"\n  },\n  \"spec\": {\n    \"description\": \"Created through the controller API instead of kubectl. Reports on nodes only.\",\n    \"type\": \"Declarative\",\n    \"declarative\": {\n      \"modelConfig\": \"default-model-config\",\n      \"systemMessage\": \"You report on the nodes of this cluster. Use k8s_get_resources with resource_type nodes and output wide, then k8s_describe_resource for details. Answer only from tool results.\",\n      \"tools\": [\n        {\n          \"type\": \"McpServer\",\n          \"mcpServer\": {\n            \"apiGroup\": \"kagent.dev\",\n            \"kind\": \"RemoteMCPServer\",\n            \"name\": \"kagent-tool-server\",\n            \"toolNames\": [\n              \"k8s_get_resources\",\n              \"k8s_describe_resource\"\n            ]\n          }\n        }\n      ]\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "update the agent (PUT, no path params)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/agents",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "agents"
+              ]
+            },
+            "description": "PUT has no namespace/name in the path; they come from `metadata`. Only `spec` is replaced.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"apiVersion\": \"kagent.dev/v1alpha2\",\n  \"kind\": \"Agent\",\n  \"metadata\": {\n    \"name\": \"node-reporter\",\n    \"namespace\": \"{{ns}}\"\n  },\n  \"spec\": {\n    \"description\": \"Updated through the API\",\n    \"type\": \"Declarative\",\n    \"declarative\": {\n      \"modelConfig\": \"default-model-config\",\n      \"systemMessage\": \"You report on the nodes of this cluster. Use k8s_get_resources with resource_type nodes and output wide, then k8s_describe_resource for details. Answer only from tool results.\",\n      \"tools\": [\n        {\n          \"type\": \"McpServer\",\n          \"mcpServer\": {\n            \"apiGroup\": \"kagent.dev\",\n            \"kind\": \"RemoteMCPServer\",\n            \"name\": \"kagent-tool-server\",\n            \"toolNames\": [\n              \"k8s_get_resources\",\n              \"k8s_describe_resource\"\n            ]\n          }\n        }\n      ]\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "delete the API-created agent",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/agents/{{ns}}/node-reporter",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "agents",
+                "{{ns}}",
+                "node-reporter"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 · Invoke an agent (A2A)",
+      "description": "Agents are invoked over the A2A protocol at `/api/a2a/{ns}/{name}/`: JSON-RPC 2.0, method `message/send`. The controller forwards to the agent pod and returns a Task whose `status.state` is `completed`, `failed`, `working` or `input-required` (waiting for a human). Without an `A2A-Version` header the wire format is A2A 0.3 (lowercase states); with `A2A-Version: 1.0` the v1 format. a2a/a2a_handler_mux.go",
+      "item": [
+        {
+          "name": "1 · agent card",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/a2a/{{ns}}/{{agent}}/.well-known/agent-card.json",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "a2a",
+                "{{ns}}",
+                "{{agent}}",
+                ".well-known",
+                "agent-card.json"
+              ]
+            },
+            "description": "Built by the controller from the Agent resource: name, description, skills, and the URL callers should use."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 · message/send · ask the troubleshooter",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/a2a/{{ns}}/{{agent}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "a2a",
+                "{{ns}}",
+                "{{agent}}"
+              ]
+            },
+            "description": "One JSON-RPC call; the agent's whole tool loop runs behind it (30 s to 2 min). The test script stores `task_id` and `session_id` (= `contextId`) and prints the answer. Set the `agent` variable to try the other agents.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"1\",\n  \"method\": \"message/send\",\n  \"params\": {\n    \"message\": {\n      \"role\": \"user\",\n      \"kind\": \"message\",\n      \"messageId\": \"{{$guid}}\",\n      \"parts\": [\n        {\n          \"kind\": \"text\",\n          \"text\": \"Which pods in namespace demo-broken are not Running, and why? One line per pod.\"\n        }\n      ]\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);",
+                  "const r = pm.response.json().result || {};",
+                  "if (r.id) pm.collectionVariables.set('task_id', r.id);",
+                  "if (r.contextId) pm.collectionVariables.set('session_id', r.contextId);",
+                  "console.log('state:', r.status && r.status.state);",
+                  "const texts = (r.artifacts || []).flatMap(a => a.parts || []).filter(p => p.text).map(p => p.text);",
+                  "if (texts.length) console.log('ANSWER:\\n' + texts.at(-1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 · message/send · follow-up in the same session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/a2a/{{ns}}/{{agent}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "a2a",
+                "{{ns}}",
+                "{{agent}}"
+              ]
+            },
+            "description": "Same `contextId` = same session: the agent sees the previous turn.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"1\",\n  \"method\": \"message/send\",\n  \"params\": {\n    \"message\": {\n      \"role\": \"user\",\n      \"kind\": \"message\",\n      \"messageId\": \"{{$guid}}\",\n      \"parts\": [\n        {\n          \"kind\": \"text\",\n          \"text\": \"Which of those would you fix first, and how?\"\n        }\n      ],\n      \"contextId\": \"{{session_id}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);",
+                  "const r = pm.response.json().result || {};",
+                  "if (r.id) pm.collectionVariables.set('task_id', r.id);",
+                  "if (r.contextId) pm.collectionVariables.set('session_id', r.contextId);",
+                  "console.log('state:', r.status && r.status.state);",
+                  "const texts = (r.artifacts || []).flatMap(a => a.parts || []).filter(p => p.text).map(p => p.text);",
+                  "if (texts.length) console.log('ANSWER:\\n' + texts.at(-1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4 · tasks/get",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/a2a/{{ns}}/{{agent}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "a2a",
+                "{{ns}}",
+                "{{agent}}"
+              ]
+            },
+            "description": "The stored task with its history and artifacts.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"2\",\n  \"method\": \"tasks/get\",\n  \"params\": {\n    \"id\": \"{{task_id}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5 · sre-operator · a change that needs approval",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/a2a/{{ns}}/sre-operator/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "a2a",
+                "{{ns}}",
+                "sre-operator"
+              ]
+            },
+            "description": "`sre-operator` lists `k8s_scale` in `requireApproval`. Expect `status.state: input-required`: the runtime emitted an `adk_request_confirmation` call and is waiting. The pending call is in the task's last message as a data part.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"1\",\n  \"method\": \"message/send\",\n  \"params\": {\n    \"message\": {\n      \"role\": \"user\",\n      \"kind\": \"message\",\n      \"messageId\": \"{{$guid}}\",\n      \"parts\": [\n        {\n          \"kind\": \"text\",\n          \"text\": \"Scale the deployment web in namespace demo-broken to 3 replicas.\"\n        }\n      ]\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);",
+                  "const r = pm.response.json().result || {};",
+                  "if (r.id) pm.collectionVariables.set('task_id', r.id);",
+                  "if (r.contextId) pm.collectionVariables.set('session_id', r.contextId);",
+                  "console.log('state:', r.status && r.status.state);",
+                  "const texts = (r.artifacts || []).flatMap(a => a.parts || []).filter(p => p.text).map(p => p.text);",
+                  "if (texts.length) console.log('ANSWER:\\n' + texts.at(-1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6 · sre-operator · approve the pending change",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/a2a/{{ns}}/sre-operator/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "a2a",
+                "{{ns}}",
+                "sre-operator"
+              ]
+            },
+            "description": "Approval is another `message/send` on the same `contextId` and `taskId`, with a data part `{decision_type: approve}` (or `reject`, optionally with `rejection_reason`). This is what the UI's Approve button sends (ui/src/components/chat/ChatInterface.tsx). The task then continues and completes.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"1\",\n  \"method\": \"message/send\",\n  \"params\": {\n    \"message\": {\n      \"role\": \"user\",\n      \"kind\": \"message\",\n      \"messageId\": \"{{$guid}}\",\n      \"contextId\": \"{{session_id}}\",\n      \"taskId\": \"{{task_id}}\",\n      \"parts\": [\n        {\n          \"kind\": \"data\",\n          \"data\": {\n            \"decision_type\": \"approve\"\n          }\n        },\n        {\n          \"kind\": \"text\",\n          \"text\": \"Approved\"\n        }\n      ]\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);",
+                  "const r = pm.response.json().result || {};",
+                  "if (r.id) pm.collectionVariables.set('task_id', r.id);",
+                  "if (r.contextId) pm.collectionVariables.set('session_id', r.contextId);",
+                  "console.log('state:', r.status && r.status.state);",
+                  "const texts = (r.artifacts || []).flatMap(a => a.parts || []).filter(p => p.text).map(p => p.text);",
+                  "if (texts.length) console.log('ANSWER:\\n' + texts.at(-1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7 · message/stream · the orchestrator (long-running agents)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "text/event-stream"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/a2a/{{ns}}/sre-orchestrator/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "a2a",
+                "{{ns}}",
+                "sre-orchestrator"
+              ]
+            },
+            "description": "`message/send` through the controller times out after 3 minutes (the a2a-go client's default), and the orchestrator, which calls other agents in turn, takes longer. `message/stream` returns server-sent events as the agent works: status updates (each delegated call appears as a function-call data part named kagent__NS__<agent>), artifact updates with the answer, and a final status. Postman shows the stream as it arrives.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"1\",\n  \"method\": \"message/stream\",\n  \"params\": {\n    \"message\": {\n      \"role\": \"user\",\n      \"kind\": \"message\",\n      \"messageId\": \"{{$guid}}\",\n      \"parts\": [\n        {\n          \"kind\": \"text\",\n          \"text\": \"Something is wrong in namespace demo-broken. Find every problem and give me the fix for each. Do not change anything.\"\n        }\n      ]\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8 · message/send with A2A-Version 1.0",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "A2A-Version",
+                "value": "1.0"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/a2a/{{ns}}/{{agent}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "a2a",
+                "{{ns}}",
+                "{{agent}}"
+              ]
+            },
+            "description": "Same call, v1 wire format: the response uses `TASK_STATE_COMPLETED`-style enums.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"1\",\n  \"method\": \"message/send\",\n  \"params\": {\n    \"message\": {\n      \"role\": \"user\",\n      \"kind\": \"message\",\n      \"messageId\": \"{{$guid}}\",\n      \"parts\": [\n        {\n          \"kind\": \"text\",\n          \"text\": \"How many nodes does this cluster have?\"\n        }\n      ]\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);",
+                  "console.log(JSON.stringify(pm.response.json().result && pm.response.json().result.status));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7 · Sessions and tasks",
+      "description": "A session is a conversation with one agent; its id is the A2A `contextId`. The UI creates one per chat. handlers/sessions.go, handlers/tasks.go",
+      "item": [
+        {
+          "name": "create a session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/sessions?user_id={{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "sessions"
+              ],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}"
+                }
+              ]
+            },
+            "description": "`agent_ref` is required. The returned `id` is used as `contextId` in A2A messages. The test script stores it.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agent_ref\": \"{{ns}}/{{agent}}\",\n  \"name\": \"postman session\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);",
+                  "const d = pm.response.json().data || pm.response.json();",
+                  "if (d.id) pm.collectionVariables.set('session_id', d.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "message/send inside that session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/a2a/{{ns}}/{{agent}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "a2a",
+                "{{ns}}",
+                "{{agent}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"1\",\n  \"method\": \"message/send\",\n  \"params\": {\n    \"message\": {\n      \"role\": \"user\",\n      \"kind\": \"message\",\n      \"messageId\": \"{{$guid}}\",\n      \"parts\": [\n        {\n          \"kind\": \"text\",\n          \"text\": \"Summarise the state of namespace demo-broken in three lines.\"\n        }\n      ],\n      \"contextId\": \"{{session_id}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);",
+                  "const r = pm.response.json().result || {};",
+                  "if (r.id) pm.collectionVariables.set('task_id', r.id);",
+                  "if (r.contextId) pm.collectionVariables.set('session_id', r.contextId);",
+                  "console.log('state:', r.status && r.status.state);",
+                  "const texts = (r.artifacts || []).flatMap(a => a.parts || []).filter(p => p.text).map(p => p.text);",
+                  "if (texts.length) console.log('ANSWER:\\n' + texts.at(-1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "list my sessions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sessions?user_id={{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "sessions"
+              ],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}"
+                }
+              ]
+            },
+            "description": "Filtered by user. The UI's chats are here too, under `admin@kagent.dev`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "sessions of one agent",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sessions/agent/{{ns}}/{{agent}}?user_id={{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "sessions",
+                "agent",
+                "{{ns}}",
+                "{{agent}}"
+              ],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "session with its events",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sessions/{{session_id}}?user_id={{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "sessions",
+                "{{session_id}}"
+              ],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}"
+                }
+              ]
+            },
+            "description": "`{session, events: [...]}`. Each event's `data` is a JSON-encoded A2A message: user turns, tool calls, tool results, agent text."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "tasks of the session",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sessions/{{session_id}}/tasks?user_id={{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "sessions",
+                "{{session_id}}",
+                "tasks"
+              ],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "get a task",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tasks/{{task_id}}?user_id={{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "{{task_id}}"
+              ],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "delete the session",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sessions/{{session_id}}?user_id={{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "sessions",
+                "{{session_id}}"
+              ],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8 · The controller's own MCP endpoint (agents as tools)",
+      "description": "The controller serves an MCP server at `/mcp` on port 8083 with two tools: `list_agents` and `invoke_agent`. Any MCP client, or another agent, can use kagent agents as tools this way. internal/mcp/mcp_handler.go",
+      "item": [
+        {
+          "name": "1 · initialize",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mcp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "Server name is `kagent-agents`. Stateful unless the controller runs with KAGENT_MCP_STATELESS=true, so keep the session header.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"initialize\",\n  \"params\": {\n    \"protocolVersion\": \"2025-03-26\",\n    \"capabilities\": {},\n    \"clientInfo\": {\n      \"name\": \"postman\",\n      \"version\": \"1.0\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);",
+                  "const h = pm.response.headers.get('mcp-session-id');",
+                  "if (h) { pm.collectionVariables.set('mcp_session_id', h); console.log('session', h); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 · notifications/initialized",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Mcp-Session-Id",
+                "value": "{{mcp_session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mcp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"notifications/initialized\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 · tools/list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Mcp-Session-Id",
+                "value": "{{mcp_session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mcp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "Expect `list_agents` and `invoke_agent`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 2,\n  \"method\": \"tools/list\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4 · tools/call · list_agents",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Mcp-Session-Id",
+                "value": "{{mcp_session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mcp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "Only agents that are accepted and whose deployment is ready are listed.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 3,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"list_agents\",\n    \"arguments\": {}\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5 · tools/call · invoke_agent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              },
+              {
+                "key": "Mcp-Session-Id",
+                "value": "{{mcp_session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mcp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "description": "Runs an A2A message/send behind the scenes and returns the agent's text plus `{agent, text, context_id}`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 4,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"invoke_agent\",\n    \"arguments\": {\n      \"agent\": \"{{ns}}/{{agent}}\",\n      \"task\": \"How many nodes does this cluster have, and which version do they run?\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9 · Feedback",
+      "description": "Thumbs up/down on an agent message, as the UI does. handlers/feedback.go",
+      "item": [
+        {
+          "name": "submit feedback",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/feedback?user_id={{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "feedback"
+              ],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}"
+                }
+              ]
+            },
+            "description": "`feedback_text` is required; `issue_type` is one of instructions, factual, incomplete, tool.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_positive\": true,\n  \"feedback_text\": \"Found the ImagePullBackOff and quoted the event.\",\n  \"issue_type\": \"factual\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "list feedback",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/feedback?user_id={{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "feedback"
+              ],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.response.to.be.success);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

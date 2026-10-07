@@ -1,0 +1,15 @@
+# agent|id|question
+cluster-troubleshooter|s01|Why is the deployment api in namespace demo-broken not running?
+cluster-troubleshooter|s02|Why does the pod of deployment worker in namespace demo-broken keep restarting? Quote the log line.
+cluster-troubleshooter|s03|The pod of deployment cache in namespace demo-broken restarts every minute. What is happening to it?
+cluster-troubleshooter|s04|The Service checkout in namespace demo-broken returns connection refused. Why?
+cluster-troubleshooter|s05|Why is the pod of deployment batch in namespace demo-broken Pending?
+cluster-troubleshooter|s06|Which pods in namespace demo-broken are healthy, and which are not? One line each.
+observability-analyst|s07|Which containers in namespace demo-broken restarted most in the last 30 minutes, and how many times?
+observability-analyst|s08|How much CPU and memory is each node using right now, as a share of its capacity?
+observability-analyst|s09|Which alert rules exist in Grafana, and are any of them firing?
+release-manager|s10|Which Helm releases are installed, in which namespaces, and what chart version is each?
+runbook-assistant|s11|The pod of deployment cache in demo-broken is OOMKilled. Diagnose it and tell me what the Kubernetes documentation says about memory limits and OOMKilled.
+incident-reporter|s12|Write an incident report for namespace demo-broken.
+sre-orchestrator|s13|Something is wrong in namespace demo-broken. Find every problem and give me the fix for each. Do not change anything.
+sre-orchestrator|s14|Is the cluster under CPU or memory pressure right now, and is anything in demo-broken restarting because of it?
