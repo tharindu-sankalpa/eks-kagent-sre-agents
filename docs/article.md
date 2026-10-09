@@ -136,6 +136,13 @@ Every YAML agent in this build is the same four parts, and the differences betwe
 
 The seventh field that matters is `type: Agent` in a tool list: an agent as a tool of another agent. The orchestrator has six of those and no MCP server.
 
+![kagent UI Models page listing the five model configs](screenshots/kagent-ui-models-five.png)
+
+*The five models in the kagent UI. Every provider reads `OpenAI` because every one goes through OpenRouter; the id column is what differs.*
+![kagent UI Agents page showing six agents, one marked Agent not Accepted](screenshots/kagent-ui-agents-six-one-not-accepted.png)
+
+*The Agents page before the orchestrator was added. Look at the bottom-middle card: `runbook-assistant` was rejected because it referenced the documentation server by the wrong kind, the kind of error the UI shows and the setup guide explains.*
+
 | Agent | Model | Tool sources | Changes the cluster | Distinctive feature |
 |---|---|---|---|---|
 | `cluster-troubleshooter` | deepseek-v4.1-flash | 9 read-only `k8s_*` | no | built-in prompt snippets |
@@ -155,6 +162,13 @@ The bring-your-own agent is about 230 lines in two files. `agent.py` opens an MC
 
 The bring-your-own MCP server is smaller still: four Python functions with type hints and docstrings under `src/tools/`, which FastMCP turns into tool schemas; `kmcp init` wrote everything else, `kmcp build` built the image, and an `MCPServer` resource with `transportType: http` ran it. kagent discovered its four tools with no further resource.
 
+![kagent UI MCP and tools page listing five servers and 195 tools](screenshots/kagent-ui-mcp-tools-five-servers.png)
+
+*Every tool source in the build: two `RemoteMCPServer` resources (124 and 65 tools), two `MCPServer` resources run by kmcp (1 and 4), and one labelled Service (1).*
+![AWS console ECR repositories holding the two images built here](screenshots/aws-console-ecr-repositories.png)
+
+*The two images built in this article, in ECR: the MCP server from `kmcp build`, the agent from `docker buildx`.*
+
 ## The key concept: delegation with a gate in the path
 
 The orchestrator is the agent this article is about, because it is where the governance either holds or does not. It has no Kubernetes tools. Its `tools` list is six entries of `type: Agent`, and kagent presents each one to its model as a callable tool whose description is the other agent's `description` field, the same way an MCP server's tools are presented. When the orchestrator calls one, the runtime sends an A2A `message/send` to that agent's Service and feeds the answer back as a tool result. The specialists keep their own models, prompts and tool lists; the orchestrator never sees a `k8s_*` tool.
@@ -171,6 +185,10 @@ Scenario 15 is the whole mechanism in one request: "Fix the Service checkout in 
 5. One `approve` later, the patch ran, the operator verified three endpoints, and the orchestrator reported what was wrong, what changed, how to roll back, and which specialists it used.
 
 Three calls from the client, 62 seconds, two human decisions, one change. The approval gate on the operator was defined once, on the operator, and it held when the operator was called by another agent rather than by a person.
+
+![kagent UI chat with sre-orchestrator paused at a three-choice question](screenshots/kagent-ui-orchestrator-ask-user-question.png)
+
+*The same request in the kagent UI. Look at the card above the question: the troubleshooter call is already `Completed`, and the orchestrator is waiting on the human with the proposed patch and its rollback spelled out.*
 
 <!-- TODO(diagram): docs/diagrams/05-approval-flow.jpg -->
 *The approval gate on its own, from the earlier direct test of `sre-operator`: the request, the pause with the pending call, the decision, the result. Reject follows the same path and runs nothing.*

@@ -168,6 +168,10 @@ ADDONS  vpc-cni
 ```
 
 Installed add-on versions: `aws-ebs-csi-driver` v1.66.0-eksbuild.1, `eks-pod-identity-agent` v1.3.10-eksbuild.3, `metrics-server` v0.9.0-eksbuild.11. The cluster is EKS 1.34, platform `eks.34`.
+![AWS console EKS Compute tab showing two t3.xlarge on-demand nodes in the workers node group](screenshots/aws-console-eks-compute-nodes.png)
+
+*The Compute tab of the cluster in the AWS console, three minutes after the node group finished: two `t3.xlarge` On-Demand nodes in `workers`, both `Ready`. The account label is covered.*
+
 
 To use the cluster from a normal terminal as well, the same context was added to the default kubeconfig; `kubectl config use-context kagent-sre-lab` selects it:
 
@@ -238,6 +242,10 @@ The controller shows 2 restarts. Its previous log explains them:
 ```
 
 It started before PostgreSQL was listening, exited, and was restarted by Kubernetes until the database was up. No action is needed; it is worth knowing so the restarts are not mistaken for a problem.
+![k9s showing the nine pods of the kagent namespace, all Running](screenshots/k9s-kagent-pods-running.png)
+
+*The `kagent` namespace in k9s, captured after steps 7 to 10, so the Grafana MCP, `fetch` and `netprobe-mcp` pods are there too. Look at the controller's 2 restarts. Names, IPs and ages will differ for you.*
+
 
 ### The MCP servers kagent installs
 
@@ -315,6 +323,10 @@ kagent-tool-server   STREAMABLE_HTTP   http://kagent-tools.kagent:8084/mcp   Tru
 ```
 
 The tool server is `ACCEPTED True` after the nudge in step 5, with 124 tools in `status.discoveredTools`. kagent also picked up the `fetch` server (as an `MCPServer` tool source, URL `http://fetch.kagent:3000/mcp`) and the `querydoc` Service (by its `kagent.dev/mcp-service: "true"` label); both appear under `GET /api/toolservers` (step 12).
+![k9s listing the two MCPServer resources, fetch and netprobe-mcp, both Ready](screenshots/k9s-mcpservers.png)
+
+*The `MCPServer` resources in k9s (`:mcpservers`), captured after step 10, so `netprobe-mcp` is already there next to `fetch`. `READY True` is the kmcp controller's verdict that the Deployment is up.*
+
 
 The broken workloads, a minute after apply:
 
@@ -436,6 +448,10 @@ kagent-tool-server   STREAMABLE_HTTP   http://kagent-tools.kagent:8084/mcp      
 ```
 
 kagent discovered 65 tools on the Grafana server (`list_datasources`, `query_prometheus`, `search_dashboards`, ...). Only `kagent-grafana-mcp.kagent:8000` is in the allow-list; the `.svc` and `.svc.cluster.local` forms still return 403, which is fine because the controller uses the short form.
+![k9s listing the two RemoteMCPServer resources with their URLs](screenshots/k9s-remotemcpservers.png)
+
+*The two `RemoteMCPServer` resources in k9s (`:remotemcpservers`): the built-in tool server and the Grafana MCP server. Each is only a protocol and a URL; the tools live in the status.*
+
 
 One detail: the status message stayed at `Forbidden` for a while after the fix was rolled out. The condition only changes when the controller reconciles the resource again, so a stale `False` after a fix is not proof that the fix failed. Nudge, then wait.
 
@@ -504,6 +520,10 @@ $ kmcp build --platform linux/amd64 --tag <ACCOUNT_ID>.dkr.ecr.ap-south-1.amazon
 ```
 
 `kmcp build` runs `docker build` in the project directory with the given tag and platform, then `docker push`. `--platform linux/amd64` matters on an Apple Silicon machine: the nodes are x86_64. The pushed image is 98 MB (`aws ecr describe-images`).
+![AWS console ECR private repositories: incident-reporter-agent and netprobe-mcp](screenshots/aws-console-ecr-repositories.png)
+
+*The two repositories in the ECR console after both pushes (the agent image is built in step 13). The repository URIs carry the account id and are covered.*
+
 
 ### 10.5 Deploy as an `MCPServer`
 
@@ -535,6 +555,10 @@ kagent/netprobe-mcp MCPServer.kagent.dev tools=4
 ```
 
 Five tool sources, 195 tools, three ways of being registered: a `RemoteMCPServer` (URL), an `MCPServer` (run by kmcp), a labelled Service.
+![kagent UI MCP and tools page listing five servers and 195 tools](screenshots/kagent-ui-mcp-tools-five-servers.png)
+
+*The same five sources in the kagent UI (View → MCP & tools): `fetch` 1, Grafana 65, `querydoc` 1, the tool server 124, `netprobe-mcp` 4.*
+
 
 ## 11. The agents
 
@@ -542,6 +566,16 @@ What this does: creates seven agents from the files in `infra/kagent/agents/`, o
 
 ```bash
 $ kubectl apply -f infra/kagent/models/            # four more ModelConfigs (the fifth came from the chart)
+```
+
+![k9s listing five ModelConfig resources, all provider OpenAI](screenshots/k9s-modelconfigs.png)
+
+*The five `ModelConfig` resources in k9s (`:modelconfigs`). Every provider is `OpenAI` because every model is reached through OpenRouter's OpenAI-compatible API; the MODEL column is the OpenRouter model id.*
+![kagent UI Models page listing the five model configs](screenshots/kagent-ui-models-five.png)
+
+*The same five in the kagent UI (View → Models).*
+
+```bash
 $ kubectl apply -f infra/kagent/prompts/           # the orchestrator's prompt, as a ConfigMap
 $ ACCT=$(aws sts get-caller-identity --query Account --output text)
 $ for f in infra/kagent/agents/*.yaml; do sed "s/<ACCOUNT_ID>/$ACCT/" "$f" | kubectl apply -f -; done
@@ -582,6 +616,13 @@ Accepted=False: failed to compile agent kagent/runbook-assistant: RemoteMCPServe
 ```
 
 Cause: the documentation server is not a `RemoteMCPServer`. kagent registered it from its Service label (`kagent.dev/mcp-service: "true"`), so an agent references it as `kind: Service`. Fix: change the reference and re-apply; accepted on the next reconcile.
+![kagent UI Agents page showing six agents, runbook-assistant marked Agent not Accepted](screenshots/kagent-ui-agents-six-one-not-accepted.png)
+
+*The Agents page at that moment (before the orchestrator existed): six cards, each with its model, and `runbook-assistant` flagged "Agent not Accepted". The bring-your-own agent shows its image instead of a model.*
+![k9s listing six Agent resources with READY and ACCEPTED columns](screenshots/k9s-agents-six.png)
+
+*The same state in k9s (`:agents`): `runbook-assistant` has no READY value and `ACCEPTED False`; the BYO agent has no RUNTIME.*
+
 
 ### The Go runtime: tried, not available
 
@@ -824,6 +865,10 @@ Verdict: **correct**, and it added something true that was not asked: "`kagent/r
 > **Change made (you approved it):** I had `sre_operator` patch only `spec.selector`, from `{app: checkout}` to `{app: web}`. ... **Rollback:** Patch the selector back to `{"app":"checkout"}`. ... **Specialists used:** `cluster_troubleshooter` for the diagnosis and `sre_operator` for the patch.
 
 The sequence of task states over the three calls: `submitted > working ×5 > input-required > working ×4 > input-required > working ×3 > completed`. Scripts: [scripts/ask-agent-stream.sh](../scripts/ask-agent-stream.sh) and [scripts/orchestrator-continue.sh](../scripts/orchestrator-continue.sh); events in [results/answers/sre-orchestrator/](../results/answers/sre-orchestrator/).
+![kagent UI chat with sre-orchestrator paused at a three-choice question after the troubleshooter completed](screenshots/kagent-ui-orchestrator-ask-user-question.png)
+
+*The same request in the kagent UI, run separately by the operator: the `cluster-troubleshooter` call is `Completed`, and the orchestrator is paused on its question with the proposed patch, the rollback, the caveat and three buttons. This is the `input-required` state as the UI shows it; the chat list on the left is the day's earlier runs.*
+
 
 **Scenario 13** (`Something is wrong in namespace demo-broken. Find every problem and give me the fix for each.`) **never completed through any path.** It was started three times: once with `message/send` through the controller (cut at 180 s), once with `message/stream` through the controller (cut at 180 s), and once directly against the orchestrator's Service, which was stopped by hand after the OpenRouter spend for the day passed 6 USD. The two abandoned controller runs had kept executing in the pod, and the orchestrator's log showed the `incident-reporter` card being fetched 77 times in a few minutes, which points at retries inside the delegated call. The question as phrased makes the orchestrator delegate to the slowest specialist (the full incident report, 161 s on its own) and then to the troubleshooter, so it is the one scenario that does not fit in three minutes. It is left as a documented failure rather than re-run.
 

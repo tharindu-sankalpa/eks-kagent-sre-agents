@@ -88,6 +88,10 @@ Measured on 2026-10-07, one run per question. Full answers in [results/answers/]
 
 **Approval flow (`sre-operator`):** scale `web` to 3, approved: `input-required` → `completed`, replicas 2 → 3. Scale `web` to 2, rejected: `input-required` → `completed`, replicas unchanged at 3.
 
+![kagent UI chat with sre-orchestrator paused at a three-choice question](docs/screenshots/kagent-ui-orchestrator-ask-user-question.png)
+
+*Scenario 15 in the kagent UI: the troubleshooter has answered and the orchestrator is asking the human which backend the Service should select before it calls the operator.*
+
 **Start-up:** Python runtime agent pods Ready 17 s after start with the image cached (15 s of that is the first readiness probe delay), 51 to 59 s on a first pull; the BYO pod 19 s.
 
 **Cost:** about 6 USD of OpenRouter usage for the day, including the abandoned orchestrator runs; not broken down per scenario.
