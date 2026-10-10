@@ -12,7 +12,7 @@ Testing also exposed the limits. The controller cut requests at three minutes, s
 
 The repository includes the manifests, custom code, setup procedure, original build record, API collection and raw responses used to check the results.
 
-Repo: <REPO_URL>
+Repo: https://github.com/tharindu-sankalpa/eks-kagent-sre-agents
 Article: <ARTICLE_URL>
 
 #kagent #kmcp #Kubernetes #EKS #MCP #A2A #SRE #MultiAgent #PlatformEngineering

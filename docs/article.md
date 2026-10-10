@@ -8,7 +8,7 @@ The test environment was one EKS 1.34 cluster in `ap-south-1`, with two `t3.xlar
 
 The repository contains the manifests, custom code, API collection, raw responses and original build record. The framework provides the runtime and protocol integration; this project defines the specialist roles, adds custom capabilities and checks the resulting behavior against cluster evidence.
 
-Repository: `<REPO_URL>` (replace before publication).
+Repository: https://github.com/tharindu-sankalpa/eks-kagent-sre-agents
 
 ## Reading path
 
@@ -281,4 +281,4 @@ Start with the [setup guide](setup-guide.md). The [build record](build-record.md
 
 You need AWS access with eight spare on-demand vCPUs in the region, Docker, the command-line tools listed in the guide and an OpenRouter API key. AWS bills the EKS control plane, nodes, NAT gateway, storage and ECR images while they exist. The hourly total was not calculated; teardown is included. The original cluster was deleted after testing, and the two image repositories were retained.
 
-Repository: `<REPO_URL>` (replace before publication). Markdown tables may need adaptation for the article publisher's editor. The diagrams are generated from `diagrams/prompts.md`; the screenshots are from the recorded build.
+Repository: https://github.com/tharindu-sankalpa/eks-kagent-sre-agents. Markdown tables may need adaptation for the article publisher's editor. The diagrams are generated from `diagrams/prompts.md`; the screenshots are from the recorded build.

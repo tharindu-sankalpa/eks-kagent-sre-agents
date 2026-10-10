@@ -169,7 +169,7 @@ docs/article.md                     workflow, implementation, method, results an
 docs/linkedin-post.md               short post
 docs/linkedin-carousel.md           brief and page content for the LinkedIn document post
 docs/diagrams/                      generated diagrams (NN-name.jpg) and their image prompts (prompts.md)
-docs/screenshots/                   captures from the live system
+docs/screenshots/                   captures from the live system; crops/ holds the cuts used in the carousel
 infra/eks/                          eksctl ClusterConfig, default StorageClass
 infra/kagent/values.yaml            kagent Helm values (OpenRouter default model, Grafana MCP, bundled agents off)
 infra/kagent/models/                four ModelConfigs

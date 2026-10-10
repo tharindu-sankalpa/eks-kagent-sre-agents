@@ -2,37 +2,54 @@
 
 A document post on LinkedIn is a PDF that the feed renders as a swipeable carousel. This file is the complete brief for that PDF: how to produce it, the style, and the exact text, excerpts and numbers of every page. Every fact below comes from the README, the manifests and the recorded results; nothing in the pages should be changed or added by the design tool.
 
+Repository: https://github.com/tharindu-sankalpa/eks-kagent-sre-agents
+
 ## How to produce it
 
-Paste everything from "Brief for the design tool" to the end into Claude Design (template: Document) or build it as HTML pages and print to PDF. Then:
+Give the design tool this file and, if it can read the repository, the repository itself. Then:
 
 1. Check every page against this file: numbers, names, YAML lines, arrow directions. The tool must not add facts.
-2. Export as PDF, 8 pages, 1080 × 1350 px (4:5 portrait), no margins beyond the page's own padding.
+2. Export as PDF, 13 pages, 1080 × 1350 px (4:5 portrait), no margins beyond the page's own padding.
 3. Name the file `multi-agent-sre-on-eks.pdf`. LinkedIn shows the file name as the document title in the feed.
-4. Post it with the text from [linkedin-post.md](linkedin-post.md). Links inside the PDF are not clickable on LinkedIn, so the article and repo URLs go in the post text or the first comment, and page 8 writes them out plainly.
+4. Post it with the text from [linkedin-post.md](linkedin-post.md). Links inside the PDF are not clickable on LinkedIn, so the article and repo URLs go in the post text, and pages 1 and 13 write the repo URL out plainly.
+
+## What the first version got wrong
+
+A first version was generated from an earlier eight-page brief. Keep these fixes:
+
+- Page 2 drew the six specialists as two columns with double-headed arrows between each pair, which reads as specialists calling each other. Each specialist gets its own branch from the spine, with one arrowhead on the card and none between cards.
+- Page 2's caption broke "ap-south-1" across two lines. The caption is now two fixed lines.
+- Page 3's footnote ran off the page under a 23-line excerpt. Excerpts now start at `spec:` and no page carries more than 16 lines of code.
+- The cover did not say what the system is for or what it is built with. It now does, with the repository URL.
+- The diagram boxes and arrows were hairlines. Cards now have 3 px outlines and arrows are 3 px with solid heads.
+- There was no evidence from the live system. Six screenshot crops are now placed on pages 4, 6, 10 and 12.
 
 ---
 
 ## Brief for the design tool
 
-Design an 8-page document for a LinkedIn document post (PDF carousel). Portrait pages, 1080 × 1350 px each. It is read inside the LinkedIn feed at phone width, so everything is large: body text at least 30 px, captions at least 24 px, code at least 24 px. One idea per page. No page has more than one diagram or one code excerpt. Use only the text given below; do not add, reword, shorten or invent any sentence, number, file name or YAML line. Do not add logos, icons of brands, decorative illustrations, stock imagery or photographs.
+Design a 13-page document for a LinkedIn document post (PDF carousel). Portrait pages, 1080 × 1350 px each. It is read inside the LinkedIn feed at phone width, so everything is large: body text at least 30 px, captions at least 24 px, code at least 24 px. One idea per page. No page has more than one diagram, and no page has more than one code card unless this brief shows two. Use only the text given below; do not add, reword, shorten or invent any sentence, number, file name or YAML line. Do not add decorative illustrations, stock imagery or photographs. If a page does not fit, do not shrink the type below the minimums; report which page overflowed.
 
 ### Style
 
 - Canvas #FAFAFA. Text #0F172A, secondary text #475569. A thin rule in #4F46E5 across the top of every page.
-- Each page has three fixed elements: a small-caps kicker in indigo #4F46E5 at the top left (letter-spaced, about 24 px), a bold headline below it (about 64 px, two lines at most), and a page number "n/8" bottom right in secondary text.
+- Each page has three fixed elements: a small-caps kicker in indigo #4F46E5 at the top left (letter-spaced, about 24 px), a bold headline below it (about 60 px, two lines at most), and a page number "n/13" bottom right in secondary text.
 - Typeface: one clean sans-serif such as Inter for everything except code; a monospace such as JetBrains Mono for code. Consistent sizes across pages.
-- Accent colours, used only for small marks, left accent bars, arrows and one highlighted word per headline: indigo #4F46E5 (orchestration, requests), blue #2563EB (diagnosis), amber #B45309 (changes that need approval), cyan #0E7490 (the custom agent), steel-blue #0369A1 (results and tool calls, dashed). Fills on cards are very pale tints of the same colours; never a saturated block.
-- Diagram cards: white, 2 px slate outline, 12 px radius, a coloured left accent bar. Arrows: solid indigo for requests and delegation, dashed steel-blue for results. Every arrow has an arrowhead at its destination only.
-- Code excerpts: a dark card #1E293B with light text, a header line in the card naming the file, line numbers not shown, and up to four lines highlighted with a faint amber band. Keep the YAML indentation exactly as given.
+- Accent colours, used only for small marks, left accent bars, arrows and one highlighted phrase per headline: indigo #4F46E5 (orchestration, requests), blue #2563EB (diagnosis), amber #B45309 (changes that need approval), cyan #0E7490 (the custom agent), steel-blue #0369A1 (results and tool calls, dashed). Fills on cards are very pale tints of the same colours; never a saturated block.
+- Diagram cards: white fill, a solid 3 px outline in dark slate #334155, 12 px radius, a 6 px coloured left accent bar, and the name in bold. Cards must read as solid boxes, not hairline frames. Arrows are 3 px, with a filled triangular head about 14 px long at the destination only: solid indigo for requests and delegation, dashed steel-blue for results. No double-headed arrows anywhere.
+- Screenshots: the crops in `docs/screenshots/crops/` are placed as-is, full column width, inside a card with the same 3 px slate outline and 12 px radius, never scaled so that their text falls below about 22 px on the page, never re-cropped, recoloured or annotated. Each has a one-line caption in secondary text directly beneath it.
+- Code cards: a dark card #1E293B with light text, a header line in the card naming the file, no line numbers, and the lines named under each excerpt highlighted with a faint amber band. Keep the YAML indentation exactly as given. Comments after `#` are part of the excerpt.
 - A small person-and-check mark means "a human approves before this runs"; it appears only where the text says so.
-- Plenty of empty space. If a page runs out of room, reduce nothing; report it instead.
+- Technology marks: the cover carries three badges for Amazon EKS, kagent and kmcp. Use each project's official mark unaltered, at the same height, on a white badge with the name beside it. If a mark is not available, use a text badge with the name only. No other logos anywhere.
+- Plenty of empty space.
 
 ### Page 1 · cover
 
-Kicker: `BUILD LOG · KAGENT + KMCP ON AMAZON EKS`
+Kicker: `MULTI-AGENT ORCHESTRATION · SRE WORKFLOWS ON AMAZON EKS`
 
-Headline: `Seven agents, one orchestrator, one human approval gate` (highlight "one human approval gate" in amber)
+Headline: `Multi-agent SRE workflows on Amazon EKS with kagent and kmcp` (highlight "kagent and kmcp" in indigo)
+
+Standfirst, one paragraph in secondary text, about 34 px: `An orchestrator uses six specialist agents as tools to diagnose Kubernetes faults and coordinate repairs. A human approves every change, including changes requested by another agent.`
 
 Three numbered lines, large numerals in indigo:
 
@@ -40,22 +57,28 @@ Three numbered lines, large numerals in indigo:
 2. **The orchestrator's tools are the other agents.** It has no Kubernetes tools of its own.
 3. **Every change pauses for a human.** The gate held even when one agent called another.
 
+A row of three technology badges: `Amazon EKS 1.34`, `kagent 0.9.10`, `kmcp 0.3.0`.
+
+Repository line, monospace, about 28 px: `github.com/tharindu-sankalpa/eks-kagent-sre-agents`
+
 Footer line in indigo italic: `Swipe for the setup, the YAML and the numbers →`
 
 ### Page 2 · the system
 
 Kicker: `THE SYSTEM`
 
-Headline: `One request, six specialists, five tool servers`
+Headline: `One request, six specialists, five tool servers` (highlight "six specialists" in indigo)
 
-Diagram, top to bottom, centred, four rows joined by arrows:
+Diagram, top to bottom, centred:
 
-- Row 1: a person mark labelled `SRE`, then a solid indigo arrow labelled `A2A` to a card `kagent controller`, then a solid indigo arrow to a wide indigo-accent card `sre-orchestrator` with caption `Its tools are six agents`.
-- Row 2: from the orchestrator, one indigo line to a horizontal spine, and six branches down to six small cards in this order: `cluster-troubleshooter` (blue), `observability-analyst` (teal #0F766E), `runbook-assistant` (violet #7C3AED), `release-manager` (amber, person-and-check mark), `incident-reporter` (cyan, dashed outline), `sre-operator` (amber, person-and-check mark). Label on the spine: `A2A delegation · agents as tools`.
-- Row 3: one dashed steel-blue arrow from the row of six to one wide amber-accent card `5 MCP tool servers`, caption `kagent-tools · grafana-mcp · netprobe-mcp · fetch · querydoc`.
+- Row 1: a person mark labelled `SRE`, a solid indigo arrow labelled `A2A` to a card `kagent controller`, a solid indigo arrow down to a wide indigo-accent card `sre-orchestrator` with caption `Its tools are six agents`.
+- Row 2: one indigo line leaves the bottom of the orchestrator to a horizontal spine labelled `A2A delegation · agents as tools`. From the spine, six separate branches go down, each ending with one arrowhead on the top of its own card. Six small cards in two rows of three, in this order: `cluster-troubleshooter` (blue), `observability-analyst` (teal #0F766E), `runbook-assistant` (violet #7C3AED); `release-manager` (amber, person-and-check mark), `incident-reporter` (cyan, dashed outline), `sre-operator` (amber, person-and-check mark). No arrow joins two specialist cards.
+- Row 3: one dashed steel-blue arrow from below the six cards to one wide amber-accent card `5 MCP tool servers`, caption `kagent-tools · grafana-mcp · netprobe-mcp · fetch · querydoc`.
 - Row 4: one dashed steel-blue arrow to a plain card `Kubernetes API · Prometheus · Grafana`.
 
-Caption under the diagram, secondary text: `Amazon EKS 1.34 · 2 × t3.xlarge · ap-south-1 · kagent 0.9.10 · kmcp 0.3.0 · models via OpenRouter`
+Caption under the diagram, secondary text, exactly two lines:
+`Amazon EKS 1.34 · 2 × t3.xlarge · ap-south-1`
+`kagent 0.9.10 · kmcp 0.3.0 · models via OpenRouter`
 
 ### Page 3 · an agent is a YAML file
 
@@ -66,10 +89,6 @@ Headline: `An agent is a YAML file` (highlight "YAML file" in indigo)
 Code card, header `infra/kagent/agents/sre-operator.yaml · shortened`:
 
 ```yaml
-apiVersion: kagent.dev/v1alpha2
-kind: Agent
-metadata:
-  name: sre-operator
 spec:
   type: Declarative
   declarative:
@@ -81,30 +100,165 @@ spec:
     tools:
       - type: McpServer
         mcpServer:
+          kind: RemoteMCPServer
           name: kagent-tool-server
-          toolNames:
-            - k8s_get_resources
-            - k8s_scale
-            - k8s_patch_resource
-          requireApproval:
-            - k8s_scale
-            - k8s_patch_resource
+          toolNames: [k8s_get_resources, k8s_scale, k8s_patch_resource]
+          requireApproval: [k8s_scale, k8s_patch_resource]
 ```
 
-Highlight the lines `modelConfig: grok-4-7`, `systemMessage: |`, `toolNames:` and `requireApproval:`.
+Highlight the lines starting `modelConfig:`, `systemMessage:`, `toolNames:` and `requireApproval:`.
 
-Four bullets, each with the field name in bold:
+Four bullets, field name in bold:
 
-- **modelConfig** names a ModelConfig resource: provider, model id and the API key Secret. Five models, one key, all through OpenRouter.
-- **systemMessage** is the prompt. The orchestrator's lives in a ConfigMap instead.
+- **modelConfig** names a ModelConfig resource. Page 4.
+- **systemMessage** is the prompt. Inline here; a ConfigMap or kagent's snippets elsewhere. Page 5.
 - **toolNames** selects from a server's inventory. kagent-tools offers 124 tools; this agent sees 11.
 - **requireApproval** lists the calls that pause for a human. Six of the operator's 11.
 
 Footnote, secondary text: `kubectl apply creates the Deployment, Service and A2A endpoint. No code.`
 
-### Page 4 · agents as tools
+### Page 4 · the model
 
-Kicker: `STEP 2 · DELEGATE`
+Kicker: `STEP 1 · THE MODEL`
+
+Headline: `Five models, one key, one API shape` (highlight "one API shape" in indigo)
+
+Code card, header `infra/kagent/models/grok-4-7.yaml`:
+
+```yaml
+apiVersion: kagent.dev/v1alpha2
+kind: ModelConfig
+metadata:
+  name: grok-4-7
+spec:
+  provider: OpenAI          # OpenRouter speaks the OpenAI API
+  model: x-ai/grok-4.7      # OpenRouter model id
+  apiKeySecret: kagent-openrouter
+  apiKeySecretKey: OPENROUTER_API_KEY
+  openAI:
+    baseUrl: https://openrouter.ai/api/v1
+```
+
+Highlight the lines starting `provider:`, `model:` and `baseUrl:`.
+
+Screenshot card: `docs/screenshots/crops/ui-models-five.png`. Caption: `The five ModelConfigs in the kagent UI. Provider OpenAI on every row: OpenRouter speaks that API.`
+
+Two bullets:
+
+- Every ModelConfig in this build has this shape. Only the name and the model id change.
+- One Secret, `kagent-openrouter`, serves all five. An agent picks its model by name.
+
+### Page 5 · the prompts
+
+Kicker: `STEP 1 · THE PROMPTS`
+
+Headline: `Three ways to give an agent its instructions` (highlight "its instructions" in indigo)
+
+Two code cards, stacked.
+
+First card, header `infra/kagent/agents/cluster-troubleshooter.yaml · shortened`:
+
+```yaml
+promptTemplate:
+  dataSources:
+    - kind: ConfigMap
+      name: kagent-builtin-prompts
+      alias: builtin
+systemMessage: |
+  You are a Kubernetes troubleshooter for one Amazon EKS cluster.
+  {{include "builtin/kubernetes-context"}}
+  {{include "builtin/safety-guardrails"}}
+```
+
+Highlight the two `{{include` lines.
+
+Second card, header `infra/kagent/agents/sre-orchestrator.yaml · shortened`:
+
+```yaml
+systemMessageFrom:
+  type: ConfigMap
+  name: sre-orchestrator-prompt
+  key: system.md
+```
+
+Three bullets:
+
+- **Inline.** `systemMessage` holds the text, as on page 3.
+- **kagent's snippets.** `promptTemplate` makes the text a template; `{{include}}` pulls the methodology kagent ships for its own agents.
+- **A ConfigMap.** `systemMessageFrom` keeps a long prompt as its own object, reviewable in Git without touching the Agent.
+
+### Page 6 · an MCP server
+
+Kicker: `STEP 2 · ADD A TOOL SERVER`
+
+Headline: `An MCP server is a YAML file too` (highlight "YAML file too" in amber)
+
+Code card, header `infra/kmcp/netprobe-mcpserver.yaml · shortened`:
+
+```yaml
+apiVersion: kagent.dev/v1alpha1
+kind: MCPServer
+metadata:
+  name: netprobe-mcp
+spec:
+  transportType: http       # the container serves MCP itself
+  httpTransport: { targetPort: 3000, path: /mcp }
+  deployment:
+    image: <ECR>/netprobe-mcp:0.1.0
+    port: 3000
+    cmd: python
+    args: [src/main.py, --transport, http]
+```
+
+Highlight the lines starting `transportType:` and `image:`.
+
+Screenshot card: `docs/screenshots/crops/ui-mcp-five-servers.png`. Caption: `Five tool sources discovered by kagent, 195 tools. fetch and netprobe-mcp are the two that kmcp runs.`
+
+Two bullets:
+
+- `netprobe-mcp` is four network probes written with FastMCP, scaffolded, built and pushed with the kmcp CLI. kmcp turns the resource into a Deployment and a Service.
+- A public stdio package needs no image at all: `fetch` runs on kmcp's default image behind an agentgateway adapter.
+
+### Page 7 · three kinds of tool source
+
+Kicker: `STEP 2 · WIRE TOOLS TO AN AGENT`
+
+Headline: `Three kinds of tool source, one field` (highlight "one field" in amber)
+
+Code card, header `infra/kagent/agents/runbook-assistant.yaml · shortened`:
+
+```yaml
+tools:
+  - type: McpServer
+    mcpServer:
+      kind: RemoteMCPServer   # kagent's own server, 124 tools
+      name: kagent-tool-server
+      toolNames: [k8s_get_resources, k8s_get_pod_logs]
+  - type: McpServer
+    mcpServer:
+      kind: MCPServer         # deployed by kmcp
+      name: fetch
+      toolNames: [fetch]
+  - type: McpServer
+    mcpServer:
+      kind: Service           # labelled kagent.dev/mcp-service
+      name: kagent-querydoc
+      toolNames: [query_documentation]
+```
+
+Highlight the three `kind:` lines.
+
+Three bullets, kind in bold:
+
+- **RemoteMCPServer** points at an MCP endpoint that already exists. kagent's chart registers its tool server and the Grafana server this way.
+- **MCPServer** is a server kmcp deploys and runs: `fetch` and `netprobe-mcp`.
+- **Service** is any Service carrying the `kagent.dev/mcp-service: "true"` label. Referencing querydoc any other way was rejected.
+
+Footnote, secondary text: `toolNames is the allow-list. A server's inventory is not the agent's tool set.`
+
+### Page 8 · agents as tools
+
+Kicker: `STEP 3 · DELEGATE`
 
 Headline: `The orchestrator's tools are agents` (highlight "are agents" in indigo)
 
@@ -127,7 +281,7 @@ spec:
 
 Highlight the two `type: Agent` lines.
 
-Small diagram beside or under the card: card `sre-orchestrator` (indigo) with a solid indigo arrow labelled `tool call over A2A` to card `cluster-troubleshooter` (blue), and a dashed steel-blue arrow back labelled `answer = tool result`.
+Small diagram under the card: card `sre-orchestrator` (indigo) with a solid indigo arrow labelled `tool call over A2A` to card `cluster-troubleshooter` (blue), and a separate dashed steel-blue arrow back labelled `answer = tool result`.
 
 Three bullets:
 
@@ -135,32 +289,32 @@ Three bullets:
 - The specialist keeps its own model, prompt and allowed tools. The orchestrator sees only its description and its answer.
 - The custom container agent is called the same way. Its loop is Python; its interface is A2A.
 
-### Page 5 · the approval gate
+### Page 9 · the approval gate
 
-Kicker: `STEP 3 · THE GATE`
+Kicker: `STEP 4 · THE GATE`
 
 Headline: `Nothing changes until a human says so` (highlight "a human says so" in amber)
 
-Three stacked rows, each a card with a left accent bar and a small-caps label on the left (as a timeline):
+Three stacked rows, each a card with a left accent bar and a small-caps label on the left:
 
 - Label `MODEL PICKS A TOOL`, slate bar: **The call is not executed.** `k8s_scale` is on the operator's requireApproval list, so the runtime stops before running it.
 - Label `TASK PAUSES`, amber bar, person-and-check mark: **The task returns input-required** with the exact call and its arguments. The human reads them.
 - Label `HUMAN DECIDES`, indigo bar: **Approve runs the call; reject discards it.** Same task, same context, one more message.
 
-Two bullets below:
+Two bullets:
 
 - Approved: scale `web` to 3. Replicas went 2 → 3.
 - Rejected: scale `web` to 2. The tool never ran. Replicas stayed at 3.
 
 Footnote, secondary text: `Enforced by the runtime, not the prompt. It held when the orchestrator called the operator.`
 
-### Page 6 · one repair, two pauses
+### Page 10 · one repair, two pauses
 
 Kicker: `THE TEST · SCENARIO 15`
 
 Headline: `"Fix checkout so it has endpoints"` (highlight "Fix checkout" in indigo)
 
-Five numbered steps in a vertical list, large numerals, with the actor in bold:
+Five numbered steps, large numerals, actor in bold:
 
 1. **Troubleshooter** finds the Service selects `app: checkout` but the pods are `app: web`.
 2. **Orchestrator** asks the human which backend it should use. Pause 1.
@@ -168,30 +322,44 @@ Five numbered steps in a vertical list, large numerals, with the actor in bold:
 4. **Operator** stops on `k8s_patch_resource` for approval. Pause 2.
 5. **Human** approves. Selector patched. `kubectl` shows 3 endpoints.
 
-A small strip under the list with three stat tiles: `62 s` caption `request time, three exchanges`; `2` caption `human decisions`; `1` caption `patch applied`.
+Screenshot card: `docs/screenshots/crops/s15-orchestrator-ask-user.png`. Caption: `Pause 1 in the kagent UI: the troubleshooter has completed and the orchestrator asks which backend to use, with the patch and the rollback spelled out.`
 
-Footnote, secondary text: `32 s + 16 s + 14 s. Human thinking time not included.`
+Footnote, secondary text: `62 s of request time across three exchanges (32 + 16 + 14 s), 2 human decisions, 1 patch. Human thinking time not included.`
 
-### Page 7 · the numbers
+### Page 11 · the numbers
 
 Kicker: `RESULTS · ONE CLUSTER, ONE DAY`
 
-Headline: `What the numbers said`
+Headline: `What the numbers said` (highlight "numbers" in indigo)
 
-Four large stat tiles in a 2 × 2 grid, number large in indigo, caption below:
+Four stat tiles in a 2 × 2 grid, number large in indigo, caption below:
 
 - `5 / 5` — faults diagnosed by the read-only YAML agent, 5 to 52 s each
 - `10 of 12` — specialist answers correct; one incomplete, one partly wrong
 - `1` — orchestrator task never completed: the controller cut it at 3 minutes
 - `≈ 6 USD` — model spend for the whole day, retries included
 
-Under the grid, one line in secondary text: `The five faults: bad image · crash loop · OOMKilled · Service with no endpoints · unschedulable pod.`
+One line under the grid, secondary text: `The five faults: bad image · crash loop · OOMKilled · Service with no endpoints · unschedulable pod.`
 
-### Page 8 · what broke, and where to read
+### Page 12 · on the cluster
+
+Kicker: `EVIDENCE · THE LIVE SYSTEM`
+
+Headline: `What the cluster looked like` (highlight "the cluster" in indigo)
+
+Three screenshot cards stacked, full width, each with its caption:
+
+1. `docs/screenshots/crops/eks-nodes-two.png`. Caption: `Amazon EKS console: the two t3.xlarge on-demand nodes in ap-south-1, three minutes after creation.`
+2. `docs/screenshots/crops/k9s-agents-six.png`. Caption: `k9s, Agent resources: six of the seven agents before the orchestrator was added. incident-reporter is the BYO container. runbook-assistant was not yet accepted: querydoc had been referenced as RemoteMCPServer instead of Service.`
+3. `docs/screenshots/crops/k9s-mcpservers.png`. Caption: `k9s, MCPServer resources: the two servers kmcp runs, both Ready.`
+
+Footnote, secondary text: `Captured on 2026-10-07. The cluster was deleted after the run; the repository keeps every raw response.`
+
+### Page 13 · what broke, and where to read
 
 Kicker: `LIMITS · AND THE REPO`
 
-Headline: `What broke, and where everything is`
+Headline: `What broke, and where everything is` (highlight "where everything is" in indigo)
 
 Three bullets, lead phrase bold:
 
@@ -199,9 +367,9 @@ Three bullets, lead phrase bold:
 - **Out of memory.** Three overlapping requests pushed the orchestrator past its default 1 GiB. The manifest now sets 2 GiB.
 - **Three integration fixes.** The Grafana MCP image's loopback-only Host check, a missing Go runtime image, and a Prometheus tool that rejects comparison operators.
 
-A rule, then two lines in large text with the label bold:
+A rule, then two lines, label bold, URL in monospace:
 
-- **Repository:** `<REPO_URL>` — manifests, custom code, setup guide, build record, raw responses
+- **Repository:** `github.com/tharindu-sankalpa/eks-kagent-sre-agents` — manifests, custom code, setup guide, build record, raw responses
 - **Article:** `<ARTICLE_URL>`
 
 Footer line, secondary text: `Measured on 2026-10-07. kagent 0.9.10 and kmcp 0.3.0 are pre-1.0; the Agent resource changes in kagent 1.0.`
@@ -210,9 +378,12 @@ Footer line, secondary text: `Measured on 2026-10-07. kagent 0.9.10 and kmcp 0.3
 
 ## Checklist before posting
 
-- Eight pages, portrait, every page numbered.
-- Page 2 has exactly six specialist cards and two person-and-check marks (release-manager, sre-operator).
-- Page 3 and 4 YAML matches the text above line for line.
-- Page 7 numbers match the README results table.
-- Replace `<REPO_URL>` and `<ARTICLE_URL>` on page 8 and in the post text.
+- Thirteen pages, portrait, every page numbered n/13.
+- Page 1 names the use case, the three technologies and the repository URL.
+- Page 2 has exactly six specialist cards, six arrowheads from the spine, no arrow between two specialists, and two person-and-check marks (release-manager, sre-operator). The caption is two lines and "ap-south-1" is unbroken.
+- Pages 3 to 8: every YAML line matches this file, including the `#` comments. Nothing runs off a page.
+- Diagram cards on pages 2 and 8 have solid 3 px outlines; arrows have filled heads.
+- Six screenshot crops placed unaltered, from `docs/screenshots/crops/`, each with its caption: pages 4, 6, 10 and 12.
+- Page 11 numbers match the README results table.
+- Replace `<ARTICLE_URL>` on page 13 once the article is published; it is also in the post text.
 - Nothing printed that is not in this file.
