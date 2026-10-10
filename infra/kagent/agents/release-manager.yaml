@@ -9,7 +9,7 @@ spec:
   description: Release manager. Lists and inspects Helm releases and, after approval, upgrades or rolls them back.
   type: Declarative
   declarative:
-    # runtime: go  -- tried; the chart's golang-adk image digest is not in cr.kagent.dev (ImagePullBackOff). See setup guide step 11.
+    # runtime: go  -- tried; the chart's golang-adk image digest is not in cr.kagent.dev (ImagePullBackOff). See docs/build-record.md, "The Go runtime: tried, not available".
     modelConfig: kimi-k3 # moonshotai/kimi-k3 via OpenRouter
     systemMessage: |
       You are a release manager for one Amazon EKS cluster.

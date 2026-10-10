@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Same as ask-agent.sh but over message/stream (server-sent events), for agents
-# whose work takes longer than the controller's 180-second wait on message/send
-# (the orchestrator, which calls other agents in turn). Collects every event,
+# Same as ask-agent.sh but over message/stream (server-sent events), to expose
+# progress and approval pauses. The controller still cuts streams at 180 seconds
+# in kagent 0.9.10; streaming does not bypass that timeout. Collects every event,
 # keeps the final task state and the artifact text.
 #
 #   ./scripts/ask-agent-stream.sh <agent-name> <id> "<question>"

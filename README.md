@@ -1,12 +1,26 @@
-# SRE agents on Amazon EKS with kagent and kmcp
+# Multi-agent SRE workflows on Amazon EKS
 
-This repository builds seven AI agents for platform and SRE work on one Amazon EKS cluster, using kagent (agents as Kubernetes resources) and kmcp (MCP servers as Kubernetes resources). Six agents are YAML only. They use the 124-tool server kagent installs, a Grafana MCP server, two MCP servers run by kmcp (one a public package, one written here with FastMCP), five models through OpenRouter, and human approval for every change. The seventh agent is a container: a tool-calling loop without a framework, served with the A2A SDK. All of them are pointed at a namespace with five deliberately broken workloads, and their answers are checked against the known faults.
+This repository builds and tests multi-agent orchestration for SRE workflows using kagent and kmcp. An orchestrator uses six specialist agents as tools to diagnose Kubernetes faults and coordinate repairs. Changes pause at the operator's execution-approval gate, including when the operator is invoked by another agent.
 
-The point of the repo is not only the agents. It contains every command in the order it was run, the exact chart values and manifests, the raw A2A and REST responses, a Postman collection for the kagent API and the tool servers, and the problems hit on the way, including a tool server that refused its own controller.
+Six of the seven agents are YAML configurations: a model reference, system instructions and allowed tools. kagent supplies the deployment model, its Google ADK-based Python runtime and built-in operational tool servers. kmcp runs additional Model Context Protocol (MCP) servers. The custom work includes an in-cluster network-probe server, an incident reporter with its own tool-calling loop and Agent-to-Agent (A2A) interface, and scripts that capture and check the behavior.
 
-> **Results:** the read-only troubleshooter diagnosed all five faults correctly (5 to 52 s, 4 to 8 tool calls each); 10 of 12 specialist answers were correct, 1 incomplete, 1 partly wrong. The approval gate held on approve and on reject. The orchestrator fixed a broken Service through two human approvals, and could not finish its longest task because the controller cuts any A2A call at 3 minutes. See [Results](#results).
+> **Recorded results:** the troubleshooter diagnosed all five individual faults in 5–52 s each. Of twelve specialist answers, ten were correct, one incomplete and one partly wrong. The orchestrator repaired a Service after a backend-selection question and execution approval; its longest diagnostic task never completed. Direct approve/reject tests checked that the execution gate controlled actual changes. [Results](#results).
 
-<!-- TODO(diagram): docs/diagrams/01-system-overview.jpg -->
+## Start here
+
+| If you want to… | Read |
+|---|---|
+| Understand the workflow and engineering decisions | [Article](docs/article.md) |
+| Deploy the stack and run the demonstrations | [Setup guide](docs/setup-guide.md) |
+| Inspect resource fields, ADK, MCP, A2A and API boundaries | [Runtime and protocol reference](docs/runtime-and-protocols.md) |
+| Follow the original commands, outputs and investigations | [Build record](docs/build-record.md) |
+| Review the short public post | [LinkedIn draft](docs/linkedin-post.md) |
+
+The experiment ran on 2026-10-07. Its cluster was subsequently deleted; the recorded responses and screenshots document that run. The reordered setup procedure is reconstructed from the final manifests and has not been rerun on a fresh cluster.
+
+![System overview: SRE, kagent controller, sre-orchestrator, six specialist agents, five MCP tool servers, demo-broken and monitoring targets, platform strip](docs/diagrams/01-system-overview.jpg)
+
+*The system. An SRE reaches the orchestrator through the kagent controller over A2A; the orchestrator delegates to six specialists, which use selected tools on five MCP servers; the tools act on the demo namespace and the monitoring stack. kmcp, PostgreSQL and kagent are the platform underneath.*
 
 ## Contents
 
@@ -22,11 +36,13 @@ The point of the repo is not only the agents. It contains every command in the o
 
 ## What this builds
 
-- **kagent 0.9.10**: an `Agent` resource is a model reference, a system prompt and a list of tools; the controller runs it as a Deployment and exposes it over A2A. Its chart installs the `kagent-tools` MCP server (124 tools for Kubernetes, Helm, Prometheus, Istio, Cilium, Argo, Kubescape), a Grafana MCP server and a documentation server, plus a bundled PostgreSQL for sessions.
-- **kmcp 0.3.0**: an `MCPServer` resource becomes a Deployment and a Service. A stdio package is adapted to HTTP by an `agentgateway` sidecar; a server with its own HTTP transport runs as is. The CLI scaffolds, builds and deploys.
+- **kagent 0.9.10:** Kubernetes resources configure models, agents and tool sources. The controller creates agent Deployments and Services; the declarative Python runtime builds on Google ADK. The chart supplies operational tools and PostgreSQL-backed sessions. See the [pinned runtime sources](docs/runtime-and-protocols.md#who-runs-what).
+- **kmcp 0.3.0:** an `MCPServer` resource becomes a Deployment and Service. For stdio packages, an init container copies agentgateway and the main container runs the adapter with the package as its child. Native HTTP servers run directly. The CLI scaffolds, builds and deploys.
 - **Seven agents**, six in [infra/kagent/agents/](infra/kagent/agents/) as YAML and one in [byo/incident-reporter-agent/](byo/incident-reporter-agent/) as code. Longer introductions are in the [article](docs/article.md).
 
 ## Architecture
+
+A2A (Agent-to-Agent) carries client requests and specialist delegation. MCP (Model Context Protocol) carries tool discovery and execution. The repair path is user → orchestrator → specialist → tool server → Kubernetes API. The orchestrator has no direct Kubernetes tools; model calls go to OpenRouter.
 
 - **Cluster:** Amazon EKS 1.34 in `ap-south-1`, two availability zones, one NAT gateway, 2 × `t3.xlarge` managed nodes (4 vCPU, 16 GiB each) in private subnets, Amazon Linux 2023. Add-ons: VPC CNI, CoreDNS, kube-proxy, metrics-server, EKS Pod Identity agent, EBS CSI driver. A `gp3` StorageClass is the default.
 - **Namespace `kagent`:** kagent controller and UI, kmcp controller, PostgreSQL 18 (2 GiB volume), the `kagent-tools`, `querydoc` and `grafana-mcp` servers, the `fetch` and `netprobe-mcp` servers run by kmcp, and seven agent pods.
@@ -48,7 +64,7 @@ The point of the repo is not only the agents. It contains every command in the o
 | `release-manager` | kimi-k3 | 6 `helm_*` + 2 `k8s_*`, upgrades under approval | with approval | Go runtime tried; its image is missing from the registry |
 | `runbook-assistant` | claude-sonnet-5.5 | 4 `k8s_*`, `fetch` (kmcp), `query_documentation` (labelled Service) | no | three kinds of tool source |
 | `incident-reporter` | deepseek-v4.1-flash | tool server + netprobe over MCP, directly | no | bring your own container |
-| `sre-orchestrator` | claude-sonnet-5.5 | the six agents, as `type: Agent` tools | through `sre-operator` only | prompt in a ConfigMap |
+| `sre-orchestrator` | claude-sonnet-5.5 | the six agents, as `type: Agent` tools | tested repair via `sre-operator` | prompt in a ConfigMap |
 
 **The faults.**
 
@@ -60,15 +76,15 @@ The point of the repo is not only the agents. It contains every command in the o
 | `checkout` Service | selector `app: checkout`, pods are `app: web` | no endpoints |
 | `batch` | requests 16 CPU on 4-CPU nodes | Pending, Insufficient cpu |
 
-**The scenarios.** Fourteen questions in [scripts/scenarios.txt](scripts/scenarios.txt), each sent once as an A2A `message/send` through the kagent controller by [scripts/run-scenarios.sh](scripts/run-scenarios.sh). Each answer was compared with the fault table above and with `kubectl`. A completed task is not counted as correct unless the diagnosis names the fault. Plus the approval flow, run twice ([scripts/approval-demo.sh](scripts/approval-demo.sh)): one approve, one reject.
+**The scenarios.** Fourteen initial questions in [scripts/scenarios.txt](scripts/scenarios.txt), sent as A2A `message/send` through the controller by [scripts/run-scenarios.sh](scripts/run-scenarios.sh). Specialist questions were run once; orchestrator questions were retried over streaming, and scenario 13 was also attempted directly against its Service. Scenario 15 added delegated repair. Each answer was compared with the fault table above and with `kubectl`. A completed task is not counted as correct unless the diagnosis names the fault. Plus the approval flow, run twice ([scripts/approval-demo.sh](scripts/approval-demo.sh)): one approve, one reject.
 
 **What was recorded.** Raw A2A responses and answer text under [results/answers/](results/answers/), summarised by [scripts/summarise-scenarios.py](scripts/summarise-scenarios.py) into [results/summary/](results/summary/). REST and MCP responses under [results/raw/](results/raw/).
 
 ## Results
 
-Measured on 2026-10-07, one run per question. Full answers in [results/answers/](results/answers/), summary in [results/summary/scenarios.md](results/summary/scenarios.md).
+Measured on 2026-10-07, one run per specialist question. Orchestrator rows describe the outcomes after the documented retries. Full answers in [results/answers/](results/answers/), summary in [results/summary/scenarios.md](results/summary/scenarios.md).
 
-| # | Agent | Question (short) | s | Tool calls | Verdict |
+| # | Agent | Question (short) | Time (s) | Tool calls | Verdict |
 |---|---|---|---|---|---|
 | s01 | cluster-troubleshooter | why is `api` not running | 11 | 4 | correct |
 | s02 | cluster-troubleshooter | why does `worker` restart, quote the log | 8 | 5 | correct |
@@ -104,17 +120,17 @@ Measured on 2026-10-07, one run per question. Full answers in [results/answers/]
 
 **Agents as tools work, and the approval gate survives the nesting.** The orchestrator fixed the broken Service via the troubleshooter and the operator, with the operator's approval surfacing at the orchestrator.
 
-**Completed is not correct.** Two `completed` answers were wrong or incomplete; the orchestrator's cross-check ("they agreed on every point") is worth more than either specialist alone.
+**Completed is not correct.** Two completed specialist answers were wrong or incomplete. The orchestrator combined resource and metrics evidence in scenario 14; no controlled comparison established a general accuracy improvement.
 
-**The controller cuts every A2A call at 3 minutes**, `message/send` and `message/stream` alike (the a2a-go client's default timeout), and the task then stays `working` forever. The agent's own Service has no such limit.
+**Controller calls hit a three-minute timeout.** Both `message/send` and `message/stream` were cut at 180 s; recorded task lookups remained `working`. Direct Service access bypasses this controller boundary, but the longest direct run was stopped on cost and did not complete.
 
-**Abandoned requests keep running.** They OOM-killed the orchestrator at the default 1 GiB limit when retried, and they are where most of the 6 USD went.
+**Abandoned work can overlap with retries.** Three concurrent requests were present when the orchestrator exceeded its default 1 GiB memory limit. The final manifest sets 2 GiB. The roughly 6 USD model total includes retries, but there is no per-request cost breakdown.
 
-**Three chart details fail silently:** the Grafana MCP image's loopback-only `Host` check, the Go runtime's missing image digest, the Prometheus tool's rejection of comparison operators.
+**Three integration issues required investigation:** the Grafana MCP image's loopback-only `Host` check, the Go runtime's missing image digest, the Prometheus tool's rejection of comparison operators.
 
 ## Limitations
 
-- **One cluster, one run.** Each scenario was asked once. Pass counts describe this run, not the agents' accuracy in general.
+- **One cluster and no repeated specialist trials.** Orchestrator questions were retried during troubleshooting. Pass counts describe the recorded experiment, not general agent or model accuracy.
 - **Known faults, hand-written questions.** The questions point at the namespace; a real incident does not.
 - **Not a production setup.** The controller runs in its default `unsecure` auth mode (any caller is `admin@kagent.dev`), nothing is exposed outside the cluster, there is no NetworkPolicy, and the tool server's Kubernetes permissions are the chart's defaults.
 - **kmcp 0.3.0 adds no readiness or liveness probes** to the pods it creates.
@@ -146,10 +162,13 @@ Measured on 2026-10-07, one run per question. Full answers in [results/answers/]
 ```
 README.md
 .env.example                        the two values the build needs (OpenRouter key, Grafana password)
-docs/setup-guide.md                 every command, in order, with output, errors and teardown
-docs/article.md                     Medium article draft
+docs/setup-guide.md                 dependency-ordered deployment, checks, demonstrations and teardown
+docs/build-record.md                original commands, outputs, screenshots and investigations
+docs/runtime-and-protocols.md       resource fields, ADK runtime, MCP/A2A and API boundaries
+docs/article.md                     workflow, implementation, method, results and limitations
 docs/linkedin-post.md               short post
-docs/diagrams/prompts.md            image prompts for the diagrams
+docs/linkedin-carousel.md           brief and page content for the LinkedIn document post
+docs/diagrams/                      generated diagrams (NN-name.jpg) and their image prompts (prompts.md)
 docs/screenshots/                   captures from the live system
 infra/eks/                          eksctl ClusterConfig, default StorageClass
 infra/kagent/values.yaml            kagent Helm values (OpenRouter default model, Grafana MCP, bundled agents off)
@@ -172,7 +191,7 @@ results/summary/                    scenario table
 
 ## Reproducing
 
-Start at [docs/setup-guide.md](docs/setup-guide.md). You need an AWS account with 8 spare on-demand vCPUs in the region, Docker, and an OpenRouter API key. Billed while they exist: the EKS control plane, 2 × `t3.xlarge`, one NAT gateway, 12 GiB of gp3 volumes, two ECR repositories. The hourly total was not calculated; price it with the AWS Pricing Calculator. Teardown is the last section of the setup guide.
+Start at [docs/setup-guide.md](docs/setup-guide.md) for the prerequisites, variables and deployment sequence. You need AWS access with eight spare on-demand vCPUs, Docker, the listed command-line tools and an OpenRouter API key. Billed while they exist: the EKS control plane, 2 × `t3.xlarge`, one NAT gateway, 12 GiB of application volumes, two 50 GiB node root volumes and two ECR repositories. The hourly total was not calculated; price it with the AWS Pricing Calculator. Teardown is the last section of the setup guide.
 
 ## License
 

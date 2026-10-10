@@ -1027,7 +1027,7 @@
                 "mcp"
               ]
             },
-            "description": "Needs the kube-prometheus-stack from setup guide step 8. The tool rejects comparison operators (`>`, `<`, `==`) as \"potentially dangerous characters\", so filter with topk() instead of `> 0`.",
+            "description": "Needs the kube-prometheus-stack from the setup guide monitoring step. The tool rejects comparison operators (`>`, `<`, `==`) as \"potentially dangerous characters\", so filter with topk() instead of `> 0`.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 8,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"prometheus_query_tool\",\n    \"arguments\": {\n      \"prometheus_url\": \"http://prometheus-kube-prometheus-prometheus.monitoring:9090\",\n      \"query\": \"topk(5, sum by (namespace, pod) (kube_pod_container_status_restarts_total))\"\n    }\n  }\n}",
@@ -1154,7 +1154,7 @@
     },
     {
       "name": "4b · Call the bring-your-own MCP server directly",
-      "description": "Same handshake as folder 4, against the server built in byo/netprobe-mcp and deployed with kmcp (setup guide step 10).",
+      "description": "Same handshake as folder 4, against the server built in byo/netprobe-mcp and deployed with kmcp (setup guide custom MCP server step).",
       "item": [
         {
           "name": "1 · initialize",

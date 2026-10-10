@@ -1,147 +1,142 @@
-# SRE agents on Amazon EKS with kagent and kmcp: six agents from YAML, one tool server, one broken namespace
+# Multi-agent SRE workflows on Amazon EKS with kagent and kmcp
 
-An agent that can look at a cluster and say why a pod is failing is not hard to imagine. What is hard is everything around it: where the agent runs, how it reaches the Kubernetes API, which operations it is allowed to perform, who approves the ones that change things, and how a second and third agent get the same treatment without a new deployment pipeline each time. kagent answers those questions with Kubernetes resources: a model is a `ModelConfig`, a tool source is a `RemoteMCPServer` or an `MCPServer`, an agent is an `Agent`. This article builds six agents on one EKS cluster that way, points them at five deliberately broken workloads, and records what they found, what they got wrong, and what the YAML did not cover.
+I built and tested multi-agent orchestration for SRE workflows on Amazon EKS using kagent and kmcp. An orchestrator uses specialist agents as tools to diagnose Kubernetes faults and coordinate repairs. Before a change runs, the operator's approval gate pauses execution and surfaces the proposed tool call to the user—even when another agent called the operator.
 
-The environment is one Amazon EKS 1.34 cluster in `ap-south-1` with two `t3.xlarge` nodes. Every command, manifest and raw response is in the repository, and the build is recorded step by step in its setup guide, including the three things that went wrong.
+Six of the seven agents are defined in YAML: a model reference, system instructions and allowed tool calls. kagent deploys them and supplies the built-in operational tools. Its Python runtime builds on Google's Agent Development Kit (ADK). kmcp deploys Model Context Protocol (MCP) tool servers, including a network-probe server I developed. The seventh agent is my own Python tool-calling loop, exposed through the Agent-to-Agent (A2A) protocol.
 
-Repository: `<REPO_URL>`
+The test environment was one EKS 1.34 cluster in `ap-south-1`, with two `t3.xlarge` nodes and five deliberately broken workloads. The troubleshooter diagnosed all five individual faults. The orchestrator repaired a Service through two human decisions and verified three endpoints. Its longest diagnostic request never completed: testing exposed a controller timeout, overlapping abandoned requests and a memory failure.
 
-<!-- TODO(diagram): docs/diagrams/01-system-overview.jpg -->
-*The whole system. Look at the arrows that leave the agent pods: every one goes to an MCP server, and the main one is the tool server kagent installs.*
+The repository contains the manifests, custom code, API collection, raw responses and original build record. The framework provides the runtime and protocol integration; this project defines the specialist roles, adds custom capabilities and checks the resulting behavior against cluster evidence.
 
-## The building blocks
+Repository: `<REPO_URL>` (replace before publication).
 
-### kagent: AI agents as Kubernetes resources
+## Reading path
 
-kagent is a Kubernetes-native framework that brings agent, tool and model configuration into Kubernetes through custom resources. It includes a controller, an agent runtime, a UI and a CLI. Solo.io open sourced kagent in March 2025 and donated it to the CNCF at KubeCon Europe.
+- [Delegation and approval in one repair](#delegation-and-approval-in-one-repair)
+- [What the frameworks provide](#what-the-frameworks-provide)
+- [Defining an agent in YAML](#defining-an-agent-in-yaml)
+- [Specialists and custom implementations](#specialists-and-custom-implementations)
+- [Deployment choices](#deployment-choices)
+- [Method](#method), [results](#results) and [findings](#findings)
+- [Limitations](#limitations) and [reproduction](#reproduce-it)
 
-**The problem it solves.** Without something like it, teams end up with agents running as ad-hoc Python scripts and MCP servers running on laptops or in random containers, with no consistent security, scaling or visibility. Each agent is its own deployment problem.
+For request fields, tool inventories and transport details, see the [runtime and protocol reference](runtime-and-protocols.md). For copyable deployment commands, use the [setup guide](setup-guide.md). The [build record](build-record.md) retains the complete investigation and outputs.
 
-**How it works.** You define an agent in YAML: its system prompt, which model it uses, and which tools it can call. Then you `kubectl apply` it, and the controller runs it. In version 0.9.10, the version this build uses, the resources are:
+![System overview: SRE, kagent controller, sre-orchestrator, six specialist agents, five MCP tool servers, demo-broken and monitoring targets, platform strip](diagrams/01-system-overview.jpg)
 
-- **`ModelConfig`**: a provider, a model name, and a reference to the Secret holding the API key. kagent supports OpenAI, Anthropic, Azure OpenAI, Gemini, Vertex AI, Bedrock, Ollama and others; anything with an OpenAI-compatible API works through the `OpenAI` provider with a `baseUrl`, which is how OpenRouter is used here.
-- **`RemoteMCPServer`**: the URL of an MCP server that already exists. The controller connects to it, lists its tools and records them in the resource's status.
-- **`Agent`**: a description, a `ModelConfig` reference, a system message, and a list of tools picked by name from one or more tool sources. The controller turns it into a Deployment and a Service, and exposes it over the A2A protocol at `/api/a2a/<namespace>/<name>/`.
+*The system. An SRE reaches the orchestrator through the kagent controller over A2A; the orchestrator delegates to six specialists, which use selected tools on five MCP servers; the tools act on the demo namespace and the monitoring stack. kmcp, PostgreSQL and kagent are the platform underneath.*
 
-Two fields on an agent's tool list do most of the governance work in this article. `toolNames` is an allow-list: the agent's model never sees a tool that is not on it. `requireApproval` is a subset of that list: before any of those tools runs, the agent pauses, the task goes to the `input-required` state, and a human approves or rejects the call.
+## Delegation and approval in one repair
 
-**The built-in tool server.** kagent's chart ships ready-made tool servers. The main one, `kagent-tools`, exposed 124 tools in this build: 22 for Kubernetes (`k8s_get_resources`, `k8s_get_pod_logs`, `k8s_describe_resource`, `k8s_get_events`, `k8s_scale`, `k8s_rollout`, `k8s_apply_manifest`, `k8s_delete_resource`, ...), 6 for Helm, 5 for Prometheus, and the rest for Istio, Cilium, Argo Rollouts and Kubescape, plus `shell`. That is what makes the SRE pitch real: the tools that a troubleshooting agent needs are already running in the cluster before you write your first agent. The chart also ships a Grafana MCP server (65 tools in this build) and a documentation search server.
+The orchestrator has no direct Kubernetes tools. Its tools are six specialist agents, registered with `type: Agent`. Each specialist keeps its own model, instructions and allowed tools. kagent makes the specialist callable through A2A and returns its answer to the orchestrator as a tool result.
 
-**Memory, observability, multiple runtimes.** Agents can have long-term memory backed by a vector store, emit OpenTelemetry traces, and run on a Python or a Go runtime. None of these are used in this build.
+Scenario 15 asked:
 
-**Downsides.** It needs a Kubernetes cluster and a PostgreSQL database, which is a lot for a single chatbot or a quick prototype. It is pre-1.0, and its 1.0 alphas replace the `Agent` resource with a different model (covered under "Setup").
+> Fix the Service checkout in namespace demo-broken so that it has endpoints. Tell me what you intend to change before you do it.
 
-In short: kagent makes an agent a Kubernetes resource and ships the Kubernetes tools an SRE agent needs.
+The request exercised the complete workflow:
 
-Sources: [kagent.dev](https://kagent.dev), [source](https://github.com/kagent-dev/kagent).
+1. **Diagnose.** The orchestrator called `cluster_troubleshooter`. It found that the Service selected `app: checkout`, while the running backend pods were labelled `app: web`.
+2. **Resolve intent.** Matching `web` looked plausible, but the intended backend was an inference. The orchestrator used `ask_user` to offer three choices, with the proposed patch and rollback. The task paused in `input-required`.
+3. **Delegate the change.** The user's answer resumed the same task. The orchestrator called `sre_operator` with the specific repair request.
+4. **Approve execution.** The operator selected `k8s_patch_resource`, which is listed under its `requireApproval`. The task paused again. kagent surfaced the specialist's pending tool call and arguments through the parent conversation.
+5. **Apply and verify.** After approval, the operator changed the selector to `app: web`. The Service had three endpoints, independently confirmed with `kubectl`. The final report included evidence, the change, rollback and specialists used.
 
-### kmcp: building and deploying MCP servers
+The three client exchanges took 32 s, 16 s and 14 s: 62 s of request time in total, with two human decisions and one change. Those timings do not measure human deliberation time.
 
-Agents are only useful if they can reach tools, and MCP (Model Context Protocol) is now the standard way to expose tools to agents. kmcp is Solo.io's open source suite for lightweight MCP tool development and operations, and it is now part of the kagent project. Put simply, kmcp builds and hosts the tools, and kagent runs the agents that use them.
+The two pauses serve different purposes. The first asks which change the user intends. The second is the runtime gate on executing the selected tool. The gate is configured once on the operator and remains active when the operator is called by another agent.
 
-**The problem it solves.** Many MCP servers are packages meant to be started by a desktop client and spoken to over stdin and stdout; nothing in a cluster can call that. And a team that writes its own MCP servers needs a repeatable way to scaffold, build, deploy and have them discovered.
+![Orchestrator paused on its backend-selection question after the troubleshooter completed](screenshots/kagent-ui-orchestrator-ask-user-question.png)
 
-**How it works.**
+*A separate UI run of the same repair request. The troubleshooter has completed; the orchestrator is asking the user to confirm the backend, with the patch and rollback visible.*
 
-- **The CLI** scaffolds a project (`kmcp init python`, from a FastMCP template; Go, TypeScript and Java templates exist too), builds its image (`kmcp build`, a `docker build` with a tag derived from the project), and deploys it (`kmcp deploy`, which generates an `MCPServer` resource).
-- **The `MCPServer` resource** describes a server: an image or a package command, a port and a transport. The controller creates a Deployment, a Service, a ConfigMap and a ServiceAccount from it.
-- **The stdio adapter.** For a server that only speaks stdio, the controller adds an init container that copies the `agentgateway` binary into the pod; `agentgateway` starts the package as a child process and serves its stdio as MCP over streamable HTTP. For `npx` and `uvx` commands it even supplies a default image, so a public package becomes an in-cluster HTTP endpoint from six lines of YAML.
-- **Existing Services as tool sources.** A Kubernetes Service becomes a tool source for kagent if it carries the label `kagent.dev/mcp-service: "true"` and a port with `appProtocol: mcp` (or the `kagent.dev/mcp-service-port` annotation). kagent's own documentation search server is exposed that way.
+![Sequence of scenario 15 between the SRE, sre-orchestrator, cluster-troubleshooter and sre-operator, with two human pauses](diagrams/02-orchestrator-delegation.jpg)
 
-**Downsides.** kmcp ships no MCP servers of its own; it is machinery. At version 0.3.0 it adds no readiness or liveness probes to the pods it creates.
+*Scenario 15 as a logical sequence: twelve messages, two human pauses and one patch. The controller hop and the operator's individual MCP reads are omitted; the operator's pending patch runs only after the second decision.*
 
-In short: kmcp turns "write an MCP server" into scaffold, build, deploy, discovered.
+The direct operator tests checked execution approval separately. Approving a scale changed `web` from two to three replicas. Rejecting the opposite change left it at three. The replica counts were checked before and after; the rejected tool call did not execute.
 
-<!-- TODO(diagram): docs/diagrams/04-kmcp-two-ways.jpg -->
-*Two `MCPServer` resources, two pods. Left: a public stdio package, adapted to HTTP by agentgateway. Right: the server built in this article, serving HTTP itself. kagent discovers both the same way.*
+## What the frameworks provide
 
-Sources: [source](https://github.com/kagent-dev/kmcp), [agentgateway](https://agentgateway.dev).
+### kagent: configuration, runtime and built-in tools
 
-### Why you'd need them, and the value
+kagent brings agent configuration into Kubernetes custom resources. In this build, a `ModelConfig` selects the provider and model, an `Agent` specifies the instructions and tools, and a `RemoteMCPServer` identifies an existing tool endpoint. Applying an Agent creates its Deployment and Service.
 
-kagent and kmcp address the agent-deployment problem in several ways:
+The chart supplies the operational tools. Its main `kagent-tools` server exposed 124 tools in this run, including Kubernetes resource inspection, events, logs, scaling and patching; Helm operations; and Prometheus queries. The chart also provides a Grafana MCP server and documentation search. A troubleshooter can therefore use existing tools without implementing Kubernetes API wrappers.
 
-1. **Same operating model as the rest of your platform.** Agents, tools and model configs become declarative YAML. That gives you GitOps, version control, RBAC, namespaces and review workflows for free, and no separate "AI platform" to learn.
-2. **Agents close to the systems they operate.** Running in-cluster, agents can directly observe and act on Kubernetes, Prometheus, Grafana, Istio and so on. This makes them well suited to platform-engineering and SRE automation: diagnosing failing pods, analysing events, rolling out changes.
-3. **Standardized tool lifecycle.** kmcp turns "write an MCP server" into a repeatable path: scaffold, build an image, deploy, and get discovered by agents. You don't need a custom deployment approach for every tool.
-4. **Avoids lock-in.** It works with many LLM providers and agent frameworks, and it uses open protocols (MCP, A2A), so you can swap models or reuse tools elsewhere.
-5. **Observability and governance.** Built-in tracing lets you see what an agent did and which tools it called, which matters once agents can change production systems. Paired with agentgateway, an agent-native data plane for MCP, A2A and LLM traffic, you also get centralized authentication and policy for agent-to-tool traffic.
+The controller and the agent runtime have separate jobs. The controller reconciles Kubernetes resources and deploys agents. Inside each declarative Python agent, kagent builds on Google ADK to run the conversation and tool execution. kagent adds its MCP integration, A2A serving, session handling and approval behavior. The pinned v0.9.10 source imports ADK's `Runner` and uses `ToolContext.request_confirmation()` for approval. [Runtime source](https://github.com/kagent-dev/kagent/blob/v0.9.10/python/packages/kagent-adk/src/kagent/adk/_agent_executor.py), [approval source](https://github.com/kagent-dev/kagent/blob/v0.9.10/python/packages/kagent-adk/src/kagent/adk/_approval.py).
 
-**When it's (and isn't) worth it.** These projects fit well if you already run Kubernetes and want production AI agents, especially agents that operate infrastructure, or if several teams build MCP tools that need a shared, governed way to deploy them. They are overkill for a single chatbot or a quick prototype; a plain agent framework running locally is simpler there.
+All six declarative agents ultimately ran on Python. The Go runtime was attempted, but the chart's pinned image digest was unavailable. The custom seventh agent uses its own loop and the A2A SDK; it does not use Google ADK.
 
-### What an agent is, on the wire
+### kmcp: running tool servers on Kubernetes
 
-Before the YAML, the two mechanisms every agent in this article runs on. Both are wire formats, not frameworks.
+kmcp manages MCP servers rather than agent conversations. Its CLI scaffolds, builds and deploys projects. Its controller turns an `MCPServer` resource into a Deployment, Service, ConfigMap and ServiceAccount.
 
-**A tool-bearing chat completion is a different request.** A normal call to a chat model is one request, one text answer. Add a `tools` array to the request body, in the OpenAI function-calling format (name, description, JSON Schema `parameters`), and the model gains a second way to answer: instead of text, it can return `tool_calls`, with `finish_reason` set to `"tool_calls"` and `content` set to `null`. Nothing has been executed. The model has asked your code to run a function with these arguments and tell it the result. Your code runs the tool, appends the assistant's `tool_calls` message and a `role: "tool"` message carrying the result (matched by `tool_call_id`), and sends the whole conversation again. When the model has enough, it answers in text with `finish_reason: "stop"`. The API is stateless, so the growing message list is the model's only memory of what it asked for; drop the tool message and the request is refused. That branch on `finish_reason` is the whole difference between "a model" and "an agent", and it is what kagent's runtime does for every agent below, including the sub-agents of the orchestrator. Two consequences follow: the tool schemas are rendered into the prompt on every turn (so they cost tokens whether or not they are used), and a capable model may skip a tool and answer directly, so the system prompt has to say when a tool is required.
+This build uses two deployment paths:
 
-**The Responses API is the other shape.** OpenAI's newer Responses API (`/v1/responses`) keeps conversation state on the server (`previous_response_id`) and can execute some tools itself, including remote MCP servers declared in the request, so the client does not run the loop for those. Function tools still come back as `function_call` items the client must answer. kagent 0.9.10 speaks chat completions only (its `ModelConfig` has no field for the Responses API; the 1.0 alphas add one), and so does this build, because every model behind OpenRouter supports it.
+- **An existing stdio package:** `fetch` reads documentation pages. kmcp starts the package through `agentgateway`, which adapts its stdin/stdout interface to MCP over HTTP. No custom image was built.
+- **A custom HTTP server:** `netprobe-mcp` serves four network checks through FastMCP. `kmcp init` supplied the scaffold, `kmcp build` built and pushed the image, and an `MCPServer` resource deployed it without a stdio adapter.
 
-**MCP is how the tools get into that `tools` array.** An MCP server lists its tools (`tools/list`) with the same JSON Schema the model needs, and runs them (`tools/call`). The agent runtime copies the schemas into the chat request and forwards each `tool_calls` entry to the server that owns it. So an MCP server is a tool catalogue plus a standard way to call it, and nothing else. kagent's tool server, the Grafana server, the `fetch` server run by kmcp and the probe server built in this article are all exactly that. The transport throughout is streamable HTTP: JSON-RPC over POST, one `initialize` handshake, then a session header. The repository's Postman collection drives it by hand, with no model involved.
+kmcp ships the deployment machinery; kagent's chart ships the built-in operational tool servers. [kmcp source](https://github.com/kagent-dev/kmcp/tree/v0.3.0).
 
-**A2A is how a finished agent is called.** Two things only:
+### The two protocol boundaries
 
-- **Discovery.** `GET /.well-known/agent-card.json` returns the agent card: name, description, `capabilities` (streaming or not), `skills` (prose for the calling model to read, because agents take free-form messages, not typed arguments), and the `url` where invocation lives. It is the agent-level analogue of one entry in the `tools` array, and the orchestrator in this article reads the cards of its six specialists the same way a model reads tool schemas.
-- **Invocation.** `message/send`, a JSON-RPC call to that URL with a message (role, parts, ids), returns a task with a lifecycle: `submitted`, `working`, `completed`, `failed`, or `input-required` when the agent is waiting for a human. `message/stream` is the same call with progress arriving as server-sent events, and `tasks/get` fetches a task later. kagent serves every agent this way at `/api/a2a/<namespace>/<name>/`, and a "bring your own" agent only has to serve the same card and the same methods on port 8080.
+**Model Context Protocol (MCP)** lets an agent discover and call tools. **Agent-to-Agent (A2A)** lets a client or another agent discover and invoke an agent, receive progress and continue paused tasks.
 
-In short: tools enter through MCP, the model asks for them through `tool_calls`, the runtime loops until `finish_reason` is `stop`, and the result leaves through A2A.
+For a repair, the path is: user → orchestrator over A2A → specialist over A2A → tool server over MCP → Kubernetes API. Model calls go to OpenRouter. Using the same invocation interface for declarative and custom agents lets the orchestrator call both without owning their internal loops.
 
-## Why build it this way
+These are established framework capabilities. The engineering work here is composing them into an SRE workflow, constraining the available operations, implementing the custom pieces and testing what holds under delegation.
 
-- **Five of six agents are YAML only.** No code, no image. Each one differs in its model, its system prompt and its tool list.
-- **Governance is in the resource.** Read-only agents simply do not list the tools that change the cluster. The operator agent lists them under `requireApproval`.
-- **One model Secret, several models.** Every `ModelConfig` points at OpenRouter with the same Secret; each agent names a different model.
-- **The sixth agent is code, to show the boundary.** A plain `while` loop with tool calling, no framework, served with the A2A SDK, containerised, and run by kagent as a BYO agent. It uses a bring-your-own MCP server built with kmcp.
-- **Known-broken workloads instead of a healthy cluster.** Five workloads with five documented faults, so each answer can be checked.
-- **The source code is the reference.** Chart values, CRD fields, routes and tool schemas were read from the kagent and kmcp checkouts at pinned versions, and the tool server's live `tools/list`.
+## Defining an agent in YAML
 
-## Setup
+A declarative agent has three core inputs, plus execution approval where needed:
 
-The full commands, outputs and errors are in the [setup guide](setup-guide.md).
+| Input | Field | Purpose in this build |
+|---|---|---|
+| Model | `modelConfig` | Selects a provider, model and API-key Secret through a `ModelConfig` |
+| Instructions | `systemMessage` | Defines the specialist's task and reporting rules |
+| Allowed tools | `tools[].mcpServer.toolNames` | Selects which tools the model can call |
+| Execution approval | `tools[].mcpServer.requireApproval` | Pauses selected tool calls for a human decision |
 
-1. **Cluster.** EKS 1.34 from one `eksctl` file: two `t3.xlarge` nodes in private subnets, one NAT gateway, the EBS CSI driver and Pod Identity agent, a default `gp3` StorageClass.
-2. **kagent and kmcp.** kagent 0.9.10 from its published charts, which bring kmcp 0.3.0, the built-in tool server (124 tools), the documentation server, the UI and a bundled PostgreSQL. The default `ModelConfig` points at OpenRouter; the key lives in one Secret.
-3. **Prometheus and Grafana** (kube-prometheus-stack), and the Grafana MCP server kagent ships, with a service-account token.
-4. **Two MCP servers through kmcp.** `fetch`, a public stdio package that kmcp wraps with agentgateway (no image built), and `netprobe-mcp`, written here with FastMCP, scaffolded with `kmcp init`, built with `kmcp build`, pushed to ECR, run with the HTTP transport.
-5. **Five broken workloads** in namespace `demo-broken`: a bad image tag, a crash-looping command, an OOMKilled container, a Service selector that matches nothing, an unschedulable CPU request.
-6. **Five models** as `ModelConfig` resources, all through OpenRouter, each six lines.
-7. **Seven agents**: six from YAML, one from a container (the bring-your-own agent).
-8. **Scenarios**: fourteen questions to the agents, the approval flow with an approve and a reject, and the orchestrator run.
+The following is a shortened example based on [sre-operator.yaml](../infra/kagent/agents/sre-operator.yaml), with the instructions condensed and the tool list abbreviated. The full file includes all eleven allowed tools and all six approval-gated operations.
 
-### Why not the newest kagent
-
-The first checkout of kagent was `v1.0.0-alpha4`. Its chart installs no `Agent` CRD: an agent is a `Harness` plus an `AgentTemplate`, a running one is an `AgentInstance` in PostgreSQL, and the controller needs a separate runtime (Substrate: a gVisor worker pool, certificate and JWT pools, S3 snapshots) before any agent starts. `v1.0.0-alpha5`, two days later, renames the CRD group. The article is built on v0.9.10, the latest release at review time, where one YAML file is one agent. kagent 0.10.3 has since been released and was not evaluated. The lesson: check which resources a chart installs before designing around a project; the README did not show the difference, the CRD directory did.
-
-### The most instructive problem: a tool server that refused its own controller
-
-After enabling the Grafana MCP server that kagent's chart ships, kagent could not discover its tools:
-
-```
-calling "initialize": sending "initialize": Forbidden
+```yaml
+spec:
+  type: Declarative
+  declarative:
+    modelConfig: grok-4-7
+    systemMessage: |
+      Diagnose before you act. State the root cause and proposed change.
+      After a change, verify and report the before and after state.
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: kagent-tool-server
+          toolNames: [k8s_get_resources, k8s_patch_resource]
+          requireApproval: [k8s_patch_resource]
 ```
 
-The same `initialize` through a port-forward returned 200. With the in-cluster `Host` header it returned 403. The image the chart pins, `mcp/grafana:latest`, validates the HTTP `Host` header against a loopback-only allow-list by default, as protection against DNS rebinding, and the kagent controller calls it by its Service name. The fix is two values in the chart (`args: [--allowed-hosts, kagent-grafana-mcp.kagent:8000,...]`), after which kagent found 65 tools. The general lesson is about `latest`: a chart that pins a floating tag inherits whatever default the image adopts next, and the chart's own defaults did not account for this one. A second, smaller lesson: the resource's status stayed `Forbidden` after the fix until the controller reconciled it again, so a stale `False` is not proof a fix failed.
+`toolNames` limits the tool catalogue exposed to the model. `requireApproval` is enforced by the runtime before execution; it is not merely a prompt instruction. Neither field replaces Kubernetes RBAC, authentication or network policy. This lab uses the chart's default Kubernetes permissions.
 
-### What an agent is made of
+The orchestrator selects agents instead of MCP tools:
 
-Every YAML agent in this build is the same four parts, and the differences between the six are only in their values:
+```yaml
+tools:
+  - type: Agent
+    agent: { name: cluster-troubleshooter }
+  - type: Agent
+    agent: { name: sre-operator }
+```
 
-<!-- TODO(diagram): docs/diagrams/03-agent-anatomy.jpg -->
-*One Agent resource, taken apart. Look at the two tool fields: `toolNames` is what the model can see, `requireApproval` is what a human must confirm.*
+The [full orchestrator](../infra/kagent/agents/sre-orchestrator.yaml) lists all six specialists. Its instructions live in a ConfigMap referenced by `systemMessageFrom`. `promptTemplate` includes the built-in safety snippet through `{{include "builtin/safety-guardrails"}}`; other agents use the Kubernetes context snippet. Prompts and tool lists remain reviewable in Git.
 
-- **A model**: `modelConfig: grok-4-7`, one of five `ModelConfig` resources that differ in one line each.
-- **A system prompt**: inline, or from a ConfigMap (`systemMessageFrom`), or a Go template that includes the snippets kagent ships (`promptTemplate` with `{{include "builtin/kubernetes-context"}}`). The orchestrator uses all three.
-- **Tools, by name**: picked from one or more tool sources. The tool server offers 124; `cluster-troubleshooter` is given 9. Nothing outside the list exists for the agent.
-- **Approval**: a subset of those names. Before any of them runs, the task pauses in `input-required` and a human approves or rejects the exact call and arguments.
+![Four YAML excerpts from the sre-operator Agent paired with their effect: model, instructions, tool selection and approval](diagrams/03-agent-anatomy.jpg)
 
-The seventh field that matters is `type: Agent` in a tool list: an agent as a tool of another agent. The orchestrator has six of those and no MCP server.
+*The four fields of `sre-operator` that decide its behaviour. The excerpts are selected lines, not a complete manifest; the approval gate covers six of its eleven tools.*
 
-![kagent UI Models page listing the five model configs](screenshots/kagent-ui-models-five.png)
-
-*The five models in the kagent UI. Every provider reads `OpenAI` because every one goes through OpenRouter; the id column is what differs.*
-![kagent UI Agents page showing six agents, one marked Agent not Accepted](screenshots/kagent-ui-agents-six-one-not-accepted.png)
-
-*The Agents page before the orchestrator was added. Look at the bottom-middle card: `runbook-assistant` was rejected because it referenced the documentation server by the wrong kind, the kind of error the UI shows and the setup guide explains.*
+## Specialists and custom implementations
 
 | Agent | Model | Tool sources | Changes the cluster | Distinctive feature |
 |---|---|---|---|---|
@@ -151,69 +146,75 @@ The seventh field that matters is `type: Agent` in a tool list: an agent as a to
 | `release-manager` | kimi-k3 | `helm_*`, upgrades under approval | with approval | Go runtime tried; its image was missing |
 | `runbook-assistant` | claude-sonnet-5.5 | `k8s_*`, `fetch` (kmcp), `query_documentation` (Service) | no | three kinds of tool source |
 | `incident-reporter` | deepseek-v4.1-flash | tool server + netprobe, over MCP directly | no | bring your own container |
-| `sre-orchestrator` | claude-sonnet-5.5 | the six agents above | through `sre-operator` only | `type: Agent` tools, prompt in a ConfigMap |
+| `sre-orchestrator` | claude-sonnet-5.5 | the six agents above | tested repair via `sre-operator` | `type: Agent` tools, prompt in a ConfigMap |
 
-### Bring your own agent
+Five `ModelConfig` resources share one OpenRouter Secret. They use `provider: OpenAI` with an OpenRouter `baseUrl`; the model identifier differs. This makes model selection independent of agent deployment, but this experiment did not compare models on the same task.
 
-<!-- TODO(diagram): docs/diagrams/06-byo-agent-loop.jpg -->
-*The bring-your-own agent. Look at what kagent touches: only the A2A server on port 8080. The loop, the model and the MCP sessions are the container's own.*
+![Five model configurations in the kagent UI](screenshots/kagent-ui-models-five.png)
 
-The bring-your-own agent is about 230 lines in two files. `agent.py` opens an MCP session to each of two servers, copies their tool schemas into the chat request, and runs the tool-calling loop described above until the model answers in text. `server.py` wraps that in an `AgentExecutor` for the A2A Python SDK: a `working` status per tool step, the report as an artifact, `completed` at the end. kagent asks three things of the container: port 8080, the agent card at `/.well-known/agent-card.json` (its readiness probe), and A2A 0.3 JSON-RPC at `/`. The controller publishes its own card for the agent, forwards `message/send` to the pod, and injects `KAGENT_NAME`, `KAGENT_NAMESPACE` and `KAGENT_URL`. The image is 57 MB and the pod was Ready in 19 seconds.
+*The provider reads `OpenAI` for every entry because each model is reached through OpenRouter's OpenAI-compatible API.*
 
-The bring-your-own MCP server is smaller still: four Python functions with type hints and docstrings under `src/tools/`, which FastMCP turns into tool schemas; `kmcp init` wrote everything else, `kmcp build` built the image, and an `MCPServer` resource with `transportType: http` ran it. kagent discovered its four tools with no further resource.
+### Custom MCP tools: checking the network from inside the cluster
 
-![kagent UI MCP and tools page listing five servers and 195 tools](screenshots/kagent-ui-mcp-tools-five-servers.png)
+Kubernetes state can explain a bad selector, but an SRE also needs to test whether a name resolves and a Service actually answers. I added `dns_lookup`, `tcp_connect`, `http_check` and `tls_cert_expiry` as four typed Python functions. FastMCP derives their tool schemas from type hints and docstrings.
 
-*Every tool source in the build: two `RemoteMCPServer` resources (124 and 65 tools), two `MCPServer` resources run by kmcp (1 and 4), and one labelled Service (1).*
-![AWS console ECR repositories holding the two images built here](screenshots/aws-console-ecr-repositories.png)
+The server uses `httpx` for HTTP and `certifi` for a consistent TLS trust bundle. Its image was 98 MB. kmcp supplied the scaffold and build path; the probe functions are the custom implementation. The [component README](../byo/netprobe-mcp/README.md) documents inputs, outputs, local execution and extension.
 
-*The two images built in this article, in ECR: the MCP server from `kmcp build`, the agent from `docker buildx`.*
+![Five discovered tool sources in the kagent UI](screenshots/kagent-ui-mcp-tools-five-servers.png)
 
-## The key concept: delegation with a gate in the path
+*Two `RemoteMCPServer` resources offered 124 and 65 tools; two kmcp-managed `MCPServer` resources offered one and four; a labelled Service offered documentation search. Total: 195 tools. Each agent sees only its selected subset.*
 
-The orchestrator is the agent this article is about, because it is where the governance either holds or does not. It has no Kubernetes tools. Its `tools` list is six entries of `type: Agent`, and kagent presents each one to its model as a callable tool whose description is the other agent's `description` field, the same way an MCP server's tools are presented. When the orchestrator calls one, the runtime sends an A2A `message/send` to that agent's Service and feeds the answer back as a tool result. The specialists keep their own models, prompts and tool lists; the orchestrator never sees a `k8s_*` tool.
+### Custom agent: owning the tool-calling loop
 
-<!-- TODO(diagram): docs/diagrams/02-orchestrator-delegation.jpg -->
-*Scenario 15 as it ran. Look at the two pauses on the SRE's line: one question from the orchestrator, one approval from the operator, and the orchestrator in between never touching the cluster.*
+The incident reporter is about 230 lines across [agent.py](../byo/incident-reporter-agent/src/agent.py) and [server.py](../byo/incident-reporter-agent/src/server.py). It connects to the built-in tool server and netprobe, discovers their schemas, filters them to six Kubernetes tools and four probes, and sends those definitions with the conversation to the model.
 
-Scenario 15 is the whole mechanism in one request: "Fix the Service checkout in namespace demo-broken so that it has endpoints. Tell me what you intend to change before you do it."
+When the model requests a tool, the loop routes the call to the server that owns it, appends the result and asks the model again. It stops on a text answer or the configured turn limit. The implementation defaults to 20 turns and truncates each tool result to 12,000 characters.
 
-1. The orchestrator called `cluster_troubleshooter`, which found the selector mismatch.
-2. Rather than guess which pods the Service should select, it used the `ask_user` tool every kagent agent has, and the task paused in `input-required` with three choices and the exact patch it proposed, including the rollback.
-3. The answer went back as a data part on the same task. The orchestrator called `sre_operator` with a precise request.
-4. The operator decided on `k8s_patch_resource`, which is in its `requireApproval` list, so it paused. kagent surfaces a nested agent's pause at the parent, so the orchestrator's task went to `input-required` a second time, naming the operator's pending call.
-5. One `approve` later, the patch ran, the operator verified three endpoints, and the orchestrator reported what was wrong, what changed, how to roll back, and which specialists it used.
+The A2A SDK wrapper emits `working` updates per tool step, publishes the report as an artifact and ends in `completed` or `failed`. kagent requires port 8080, an agent card at `/.well-known/agent-card.json` and A2A 0.3 JSON-RPC at `/`. The card is also the readiness endpoint. The controller publishes its own card and injects `KAGENT_NAME`, `KAGENT_NAMESPACE` and `KAGENT_URL`.
 
-Three calls from the client, 62 seconds, two human decisions, one change. The approval gate on the operator was defined once, on the operator, and it held when the operator was called by another agent rather than by a person.
+The image was 57 MB and its pod became Ready in 19 s. The report scenario diagnosed all five faults in 161 s with 21 tool calls, including DNS, TCP and HTTP probes of `checkout`. The [protocol reference](runtime-and-protocols.md#the-custom-agent-boundary) covers the request loop and container contract in detail.
 
-![kagent UI chat with sre-orchestrator paused at a three-choice question](screenshots/kagent-ui-orchestrator-ask-user-question.png)
+![The incident-reporter container: the A2A SDK server, the startup discovery step and the agent.py loop, with the kagent controller, OpenRouter and the two MCP servers outside](diagrams/06-byo-agent-loop.jpg)
 
-*The same request in the kagent UI. Look at the card above the question: the troubleshooter call is already `Completed`, and the orchestrator is waiting on the human with the proposed patch and its rollback spelled out.*
+*The custom agent. server.py receives `message/send` from the controller and returns the report as an A2A artifact. Startup discovers tool schemas once over MCP. agent.py sends the conversation and tool schemas to the model, runs any requested tool calls over MCP, appends the results and asks again, until the model answers without tool calls.*
 
-<!-- TODO(diagram): docs/diagrams/05-approval-flow.jpg -->
-*The approval gate on its own, from the earlier direct test of `sre-operator`: the request, the pause with the pending call, the decision, the result. Reject follows the same path and runs nothing.*
+## Deployment choices
 
-The same mechanism has a cost, which scenario 13 showed. A delegated call is a full A2A round trip to another agent that runs its own loop, so an orchestrator's wall-clock time is the sum of its specialists' times plus its own model calls. Through the kagent controller, that sum has to fit in three minutes.
+The [setup guide](setup-guide.md) follows dependency order: cluster and storage, model credentials, monitoring and its token, kagent, MCP servers, the custom agent image, declarative agents, then tests. The [build record](build-record.md) preserves the order in which the original work actually happened.
+
+| Layer | Configuration |
+|---|---|
+| Cluster | EKS 1.34, two private `t3.xlarge` nodes, two availability zones, one NAT gateway |
+| Storage | Default `gp3` StorageClass; EBS CSI driver authorized through EKS Pod Identity |
+| Agent platform | kagent 0.9.10, bundled kmcp 0.3.0, PostgreSQL with 2 GiB volume |
+| Monitoring | kube-prometheus-stack 83.6.0; Prometheus with 10 GiB volume and two-day retention |
+| Models | Five configs through OpenRouter; one API-key Secret |
+| Exposure | ClusterIP Services accessed through local port-forwards |
+| Test namespace | Five documented faults in `demo-broken` |
+
+The build stayed on the reviewed v0.9.10 resource model. The v1.0 alphas replace `Agent` with `Harness`/`AgentTemplate` and require a separate runtime; v0.10.3 was released after the original source review and was not evaluated. The exact versions and migration details are in the [reference](runtime-and-protocols.md#version-and-deployment-boundaries).
+
+One instructive deployment issue was Grafana MCP tool discovery. Initializing through a local port-forward returned 200, while the controller's in-cluster request returned `Forbidden`. Testing the same request with the Service-name `Host` header reproduced 403. The `mcp/grafana:latest` image allowed only loopback hosts by default. Adding the controller's Service hostname through `--allowed-hosts`, then triggering reconciliation, made all 65 tools discoverable. The committed values include the fix. [Full investigation](build-record.md#9-the-grafana-mcp-server-that-ships-with-kagent).
 
 ## Method
 
-**The faults are known in advance.** Five workloads in `demo-broken`, each broken one way: a bad image tag (`ImagePullBackOff`), a command that prints a line and exits 1 (`CrashLoopBackOff`), 200 MiB allocated under a 64 MiB limit (`OOMKilled`), a Service selector that matches no pod (no endpoints), a 16-CPU request on 4-CPU nodes (`Pending`). An answer counts as correct only if it names the fault; a completed task that says something else is a completed task, not a correct answer.
+**The faults are known in advance.** Five workloads in `demo-broken`, each broken one way: a bad image tag (`ImagePullBackOff`), a command that prints a line and exits 1 (`CrashLoopBackOff`), 200 MiB allocated under a 64 MiB limit (`OOMKilled`), a Service selector that matches no pod (no endpoints), a 16-CPU request on 4-CPU nodes (`Pending`). A diagnosis counts as correct only if it names the configured fault and supports it with evidence. A completed task can still contain an incorrect answer.
 
-**The questions.** Fourteen in [scripts/scenarios.txt](../scripts/scenarios.txt): six to the troubleshooter (one per fault, plus a "which pods are unhealthy" question), three to the observability analyst, one to the release manager, one to the runbook assistant, one to the bring-your-own agent (a full incident report), and two to the orchestrator. Each was sent once, as an A2A `message/send` to the kagent controller, by a script that stores the raw response and the answer text. A third orchestrator question, which asks for a fix, was added after the first two.
+**The questions.** Fourteen in [scripts/scenarios.txt](../scripts/scenarios.txt): six to the troubleshooter (one per fault, plus a "which pods are unhealthy" question), three to the observability analyst, one to the release manager, one to the runbook assistant, one to the bring-your-own agent (a full incident report), and two to the orchestrator. A script sent the initial pass through the controller with A2A `message/send` and saved the raw responses and answer text. A third orchestrator question, which asks for a fix, was added after the first two.
 
 **The approval flow** was exercised twice against `sre-operator` with its own script: a scale request approved, and a scale request rejected, with the deployment's replica count checked before and after.
 
 **What was recorded.** For each scenario: the task state, wall-clock seconds for the request, the number and names of tool calls (from the function-call parts in the A2A task history), and the answer. Tool counts for the bring-your-own agent come from its own progress messages, since it does not emit kagent's metadata. Checks against the cluster used `kubectl`, `helm list` and a direct Prometheus query at the time of the run.
 
-**What was not done.** No question was repeated, no model was swapped on the same question, and nothing was timed below a second. Model cost per scenario was not recorded.
+**Scope.** Specialist questions were run once. The orchestrator questions were retried through streaming and, for scenario 13, directly against its Service. No model was swapped on the same question, and timings were recorded in whole seconds. Per-scenario model cost was not captured.
 
 ## Results
 
-Measured on 2026-10-07 on the cluster described above. Seconds are wall-clock for one request, run once. Tool calls are counted from the A2A task history. Full answers and raw responses are in `results/answers/`.
+Measured on 2026-10-07 on the cluster described above. Specialist timings are wall-clock seconds for a single request. Orchestrator outcomes include the documented retries. Tool calls come from A2A task history or the custom reporter's progress messages. Full answers and raw responses are in [results/answers/](../results/answers/).
 
-**The six specialist agents and the bring-your-own agent, twelve questions:**
+**Twelve questions to five of the six specialists, including the bring-your-own agent:**
 
-| # | Agent | Question | s | Tool calls | Verdict |
+| # | Agent | Question | Time (s) | Tool calls | Verdict |
 |---|---|---|---|---|---|
 | 1 | cluster-troubleshooter | why is `api` not running | 11 | 4 | correct: `ImagePullBackOff`, quoted the `not found` event |
 | 2 | cluster-troubleshooter | why does `worker` restart, quote the log | 8 | 5 | correct: quoted `config file /etc/worker/config.yaml not found` |
@@ -239,45 +240,45 @@ Twelve of twelve completed; ten correct, one correct but incomplete, one partly 
 
 **The orchestrator** (`sre-orchestrator`, whose only tools are the six agents above):
 
-| # | Question | Outcome | Delegated to | Human turns | s |
+| # | Question | Outcome | Delegated to | Human turns | Time (s) |
 |---|---|---|---|---|---|
 | 13 | find every problem in `demo-broken` and the fix for each | **never completed**: cut at 180 s twice by the controller's client timeout, and the direct re-run was stopped by hand on cost | `incident_reporter`, `cluster_troubleshooter` | 0 | 180+ |
 | 14 | is the cluster under CPU or memory pressure, is anything restarting because of it | **completed, correct**: no pressure (4.7% and 7.6% CPU, 15.9% and 17.4% memory), `cache` restarts from its own 64Mi limit, `worker` from exit 1; also flagged, unasked, a kagent pod with a missing image | `observability_analyst`, `cluster_troubleshooter` | 0 | 78 |
 | 15 | fix the `checkout` Service so it has endpoints; say what you intend to change first | **completed, fixed**: asked which backend to use (three choices), then the operator's `k8s_patch_resource` paused for approval, then patched the selector to `app: web`; `kubectl` showed three endpoints | `cluster_troubleshooter`, `sre_operator` | 2 | 32 + 16 + 14 |
 
-Model spend for the day, all scenarios and all retries included, was about 6 USD on OpenRouter, most of it the orchestrator.
+Model spend for the day, including all scenarios and retries, was about 6 USD on OpenRouter. Per-request spend was not captured.
 
 ## Findings
 
-**The built-in tool server is enough for a troubleshooting agent.** Five faults, five correct diagnoses from a nine-tool read-only agent on the cheapest model in the set, in 5 to 52 seconds each, with 4 to 8 tool calls. The agent is 60 lines of YAML and no code. That is the claim kagent makes, and it held.
+**Declarative configuration was sufficient for the individual diagnoses.** A nine-tool read-only agent diagnosed the five faults in 5–52 s with 4–8 calls per question. Its configuration is about 60 lines of YAML; no custom Kubernetes tool implementation was needed.
 
-**Two fields govern what an agent can do, and they are enforced by the runtime, not the prompt.** `toolNames` decides what the model sees; `requireApproval` decides what a human must confirm. The reject test shows the second one: the operator stated the change it intended, the human said no, the tool never ran, and the deployment was unchanged. No prompt instruction was involved in that outcome.
+**Delegation preserved the operator's execution gate.** The orchestrator's tools were agent references, and the specialist's approval pause surfaced through the parent. The successful repair and direct rejection test establish this behavior for the tested calls.
 
-**Agents as tools work, and the approval gate survives the nesting.** The orchestrator fixed a broken Service by asking the troubleshooter why, asking the human which backend, calling the operator, and surfacing the operator's own approval prompt one level up. Two human decisions, one patch, verified endpoints. Its tool list is six agent names.
+**A completed task can still contain an incorrect answer.** The troubleshooter classified `batch` as both healthy and unhealthy. The analyst missed four cluster-wide firing alerts. Scenario 14 combined metrics and resource evidence to distinguish node pressure from a container's own memory limit; it does not establish a general accuracy improvement from orchestration.
 
-**A completed task is not a correct answer, and an orchestrator does not fix that.** The troubleshooter listed `batch` as both healthy and unhealthy; the analyst listed six firing alerts and missed four. Both tasks were `completed`. The orchestrator's value in scenario 14 was cross-checking: it reported that two specialists "agreed on every point", which is a stronger statement than either alone.
+**Streaming did not remove the controller timeout.** The controller's A2A client cut both plain responses and streams at 180 s. Go's `http.Client.Timeout` covers reading the response body too. The recorded task remained `working`, without a final answer. Calling the agent Service directly bypasses this controller boundary, but the direct scenario 13 attempt was stopped on cost and never demonstrated completion.
 
-**Long-running agents hit a 3-minute wall at the controller.** The A2A client library kagent 0.9.10 forwards through has a 3-minute HTTP timeout, and in Go that timeout also cuts a streaming response. Any agent that works longer than that cannot be completed through the controller, with `message/send` or `message/stream`, and the task stays `working` forever. The pod's own Service has no such limit. An agent that calls other agents reaches three minutes easily.
+**Retries can overlap with abandoned work.** Work continued in the pod after some client requests timed out. Three overlapping orchestrations exceeded the default 1 GiB memory limit. The manifest now gives the orchestrator 2 GiB, and subsequent tests were serialized. Logs showed the incident-reporter card fetched 77 times in a few minutes, suggesting retries inside delegation; that mechanism was not conclusively isolated.
 
-**Abandoned requests keep running, and that is where the money went.** When the controller gave up, the orchestrator pod did not: it finished the run with nobody listening, and a retry stacked a second run on top. Three concurrent orchestrations OOM-killed the pod at its default 1 GiB limit, and the day's model spend, about 6 USD, is mostly those runs. Two things follow for anyone deploying this: give an orchestrator more memory than a specialist, and do not retry a cut request until you know the first one has finished.
+**Framework integration still needed operational investigation.** Besides the Grafana Host check, the pinned Go image was unavailable, and the Prometheus tool rejected comparison operators as potentially dangerous characters. The latter was observed through live calls to the separate `kagent-tools` image, not established from its source. Raw error evidence and workarounds remain in the [build record](build-record.md) and [protocol reference](runtime-and-protocols.md#tool-sources-and-discovery).
 
-**kmcp made the two "bring your own" pieces small.** The MCP server is four functions; `kmcp init` wrote the rest, `kmcp build` built it, and one `MCPServer` resource ran it. The agent is one loop and one A2A executor; kagent asked only for a port, a card and JSON-RPC. The orchestrator used the bring-your-own agent and the bring-your-own server without knowing either was not kagent's own.
-
-**Three chart details would have gone wrong silently.** The Grafana MCP image refuses non-loopback `Host` headers by default (`latest` tag); the Go runtime's pinned image digest is not in the registry; the Prometheus query tool rejects comparison operators. None is in a README. Each cost an hour and each has a one-line fix in the setup guide.
-
-In short: the YAML agents did the SRE work the pitch promises, the governance fields held under test including when agents call agents, and the limits that matter in practice are the controller's 3-minute timeout and the absence of cancellation.
+Most of the day's roughly 6 USD of model spend was attributed in the original notes to orchestration and abandoned runs. Per-scenario spend was not captured, so that attribution is not a measured breakdown.
 
 ## Limitations
 
-- **One run of each question.** Fourteen scenarios, each asked once, on one cluster on one day. "Ten of twelve correct" is what happened, not an accuracy figure for these agents or models.
+- **One cluster and no repeated specialist trials.** Fourteen initial scenarios and an additional repair scenario were tested on one cluster. Orchestrator questions were retried during troubleshooting. "Ten of twelve correct" is what happened, not an accuracy figure for these agents or models.
 - **Known faults and pointed questions.** The questions name the namespace and often the workload. A real incident starts with a symptom, not a resource name. The orchestrator scenarios are the closest this build comes to that.
 - **Verification was partial for the metrics answers.** The restart counts and firing alerts were checked against Prometheus at the time; the per-node CPU and memory shares were not recomputed by hand.
 - **Not a production setup.** The controller runs in its default `unsecure` auth mode (every caller is `admin@kagent.dev`), nothing is exposed outside the cluster, there is no NetworkPolicy, the tool server's Kubernetes permissions are the chart's defaults, and kmcp 0.3.0 adds no readiness or liveness probes to the pods it creates.
 - **Pre-1.0 software.** kagent 0.9.10 and kmcp 0.3.0. kagent's 1.0 alphas replace the `Agent` resource model used here; 0.10.3 was released after the source review and was not evaluated.
 - **The tool server is not part of the kagent source.** `kagent-tools` 0.2.1 is a separate image. Its argument names and its PromQL filter (which rejects comparison operators) were taken from its live `tools/list` and from calling it, not from code.
-- **Cost was not recorded.** OpenRouter charges per request; model spend per scenario was not captured.
-- **Not compared.** No other agent runtime, no other way of hosting MCP servers, no latency or throughput measurement.
+- **Per-scenario cost was not recorded.** The OpenRouter total for the day was about 6 USD; spend per scenario was not captured.
+- **Not compared.** No other agent runtime, no other way of hosting MCP servers, no controlled latency or throughput benchmark.
 
 ## Reproduce it
 
-Repository: `<REPO_URL>`. Start at `docs/setup-guide.md`. You need an AWS account with 8 spare on-demand vCPUs in the region, Docker, and an OpenRouter API key. The EKS control plane, two `t3.xlarge` nodes, one NAT gateway, 12 GiB of volumes and two ECR repositories are billed while they exist; the hourly total was not calculated. Teardown is the last section of the guide.
+Start with the [setup guide](setup-guide.md). The [build record](build-record.md) contains every original command and output; the [runtime and protocol reference](runtime-and-protocols.md) explains the resource fields, transports and API boundaries. All chart values and manifests are in `infra/`.
+
+You need AWS access with eight spare on-demand vCPUs in the region, Docker, the command-line tools listed in the guide and an OpenRouter API key. AWS bills the EKS control plane, nodes, NAT gateway, storage and ECR images while they exist. The hourly total was not calculated; teardown is included. The original cluster was deleted after testing, and the two image repositories were retained.
+
+Repository: `<REPO_URL>` (replace before publication). Markdown tables may need adaptation for the article publisher's editor. The diagrams are generated from `diagrams/prompts.md`; the screenshots are from the recorded build.

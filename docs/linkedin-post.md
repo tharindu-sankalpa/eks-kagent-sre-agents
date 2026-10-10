@@ -1,16 +1,18 @@
-I built seven SRE agents on Amazon EKS with kagent and kmcp, six of them in YAML only, and pointed them at a namespace with five deliberately broken workloads.
+I built and tested multi-agent orchestration for SRE workflows on Amazon EKS using kagent and kmcp. An orchestrator uses specialist agents as tools to diagnose Kubernetes faults and coordinate repairs, with human approval preserved across delegated calls.
 
-kagent installs a tool server with 124 Kubernetes, Helm and Prometheus tools before you write a single agent. An Agent resource is a model, a system prompt and a list of tool names. kmcp runs MCP servers as Kubernetes resources, including one I wrote with FastMCP (four network probes, about 100 lines) and built with its CLI.
+Six of the seven agents are YAML configurations: a model, system instructions and allowed tools. kagent deploys them, runs them through its Google Agent Development Kit (ADK)-based Python runtime and supplies built-in tools for Kubernetes, Helm and Prometheus. kmcp deploys the additional MCP servers.
 
-The headline: a read-only troubleshooter with nine tools diagnosed all five faults (bad image tag, crash loop, OOMKilled, a Service selector that matched nothing, an unschedulable CPU request) in 5 to 52 seconds each, quoting the event or log line. Ten of twelve specialist answers were correct; one was incomplete and one listed a Pending pod as healthy. A completed task is not a correct answer.
+I added an in-cluster network-probe server and a custom incident reporter with its own Python tool-calling loop, exposed over the Agent-to-Agent (A2A) protocol. The orchestrator can call that custom agent through the same interface as its declarative specialists.
 
-The part I wanted to test was governance. The operator agent lists its mutating tools under requireApproval. Asked to scale a deployment, it paused with the exact call and arguments; I approved, and replicas went 2 to 3. I rejected the next one and nothing changed. Then an orchestrator agent, whose only tools are the other six agents, fixed a broken Service by asking the troubleshooter why, asking me which backend to use, and calling the operator, whose approval prompt surfaced one level up. Two decisions, one patch, three endpoints.
+The test namespace had five deliberate faults. The read-only troubleshooter diagnosed all five individually in 5–52 seconds each. Of twelve specialist answers, ten were correct, one incomplete and one partly wrong.
 
-Then I hit the limits. The controller cuts every A2A call at 3 minutes, streaming included, and the task stays working forever. Requests it abandons keep running in the pod; a retry stacked three runs and OOM-killed the orchestrator. Most of the day's 6 USD of model spend was runs nobody was waiting for. The longest orchestrator question never completed.
+The repair test exercised the entire delegation path: the troubleshooter identified a Service selector mismatch; the orchestrator asked which backend to use; the operator paused on the exact patch for approval. After approval, kubectl confirmed three endpoints. A separate rejection test left the replica count unchanged.
 
-Everything is reproducible: every command in order, the manifests, the raw A2A responses, a Postman collection for the kagent API and the tool servers, and the errors I hit.
+Testing also exposed the limits. The controller cut requests at three minutes, streaming included. Abandoned work overlapped with retries and the orchestrator was OOMKilled at its default memory limit. Its longest diagnostic task never completed.
+
+The repository includes the manifests, custom code, setup procedure, original build record, API collection and raw responses used to check the results.
 
 Repo: <REPO_URL>
 Article: <ARTICLE_URL>
 
-#kagent #kmcp #Kubernetes #EKS #MCP #A2A #SRE #PlatformEngineering #AIAgents
+#kagent #kmcp #Kubernetes #EKS #MCP #A2A #SRE #MultiAgent #PlatformEngineering

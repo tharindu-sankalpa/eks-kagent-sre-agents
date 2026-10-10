@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Builds postman/kagent.postman_collection.json.
 
-Every request targets the kagent controller (port 8083) or the built-in tool
-server (port 8084) through kubectl port-forwards. Routes come from the kagent
+Requests target the kagent controller (port 8083), built-in tool server
+(port 8084), or custom netprobe server (local port 3002) through port-forwards. Routes come from the kagent
 v0.9.10 source (go/core/internal/httpserver/server.go); the comments name the
 file that defines each one.
 
@@ -179,7 +179,7 @@ calls = [
     ("k8s_describe_resource · deployment api", "k8s_describe_resource", {"resource_type": "deployment", "resource_name": "api", "namespace": "demo-broken"}, ""),
     ("k8s_get_pod_logs · worker", "k8s_get_pod_logs", {"pod_name": "<a worker pod name from the pods call>", "namespace": "demo-broken", "tail_lines": 20}, "Replace the pod name with one from the first call."),
     ("helm_list_releases", "helm_list_releases", {"all_namespaces": True}, "Helm releases in the cluster."),
-    ("prometheus_query_tool · pod restarts", "prometheus_query_tool", {"prometheus_url": "http://prometheus-kube-prometheus-prometheus.monitoring:9090", "query": "topk(5, sum by (namespace, pod) (kube_pod_container_status_restarts_total))"}, "Needs the kube-prometheus-stack from setup guide step 8. The tool rejects comparison operators (`>`, `<`, `==`) as \"potentially dangerous characters\", so filter with topk() instead of `> 0`."),
+    ("prometheus_query_tool · pod restarts", "prometheus_query_tool", {"prometheus_url": "http://prometheus-kube-prometheus-prometheus.monitoring:9090", "query": "topk(5, sum by (namespace, pod) (kube_pod_container_status_restarts_total))"}, "Needs the kube-prometheus-stack from the setup guide monitoring step. The tool rejects comparison operators (`>`, `<`, `==`) as \"potentially dangerous characters\", so filter with topk() instead of `> 0`."),
     ("datetime_get_current_time", "datetime_get_current_time", {}, ""),
     ("k8s_delete_resource · the agents do not have this tool", "k8s_delete_resource", {"resource_type": "pod", "resource_name": "does-not-exist", "namespace": "demo-broken"}, "The tool server exposes 124 tools including this one and `shell`. No agent in this build is given them: `toolNames` on each Agent is the allow-list. Calling the server directly, as here, is not subject to that list."),
 ]
@@ -206,7 +206,7 @@ for i, (name, tool, args, d) in enumerate([
 ], start=3):
     np.append(req(f"{i+1} · tools/call · {name}", "POST", "/mcp", rpc(i, "tools/call", {"name": tool, "arguments": args}),
                   desc=d, headers=dict(MCP_HEADERS, **{"Mcp-Session-Id": "{{netprobe_session_id}}"}), var="netprobe_url"))
-collection["item"].append(folder("4b · Call the bring-your-own MCP server directly", "Same handshake as folder 4, against the server built in byo/netprobe-mcp and deployed with kmcp (setup guide step 10).", np))
+collection["item"].append(folder("4b · Call the bring-your-own MCP server directly", "Same handshake as folder 4, against the server built in byo/netprobe-mcp and deployed with kmcp (setup guide custom MCP server step).", np))
 
 # 5 ------------------------------------------------------------------ agents
 agent_obj = {
