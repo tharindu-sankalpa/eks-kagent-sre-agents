@@ -22,7 +22,7 @@ A first version was generated from an earlier eight-page brief. Keep these fixes
 - Page 3's footnote ran off the page under a 23-line excerpt. Excerpts now start at `spec:` and no page carries more than 16 lines of code.
 - The cover did not say what the system is for or what it is built with. It now does, with the repository URL.
 - The diagram boxes and arrows were hairlines. Cards now have 3 px outlines and arrows are 3 px with solid heads.
-- There was no evidence from the live system. Six screenshot crops are now placed on pages 4, 6, 10 and 12.
+- There was no evidence from the live system. Six screenshot crops are now placed on pages 4, 6, 8, 10 and 12, two of them from the AWS console.
 
 ---
 
@@ -37,7 +37,7 @@ Design a 13-page document for a LinkedIn document post (PDF carousel). Portrait 
 - Typeface: one clean sans-serif such as Inter for everything except code; a monospace such as JetBrains Mono for code. Consistent sizes across pages.
 - Accent colours, used only for small marks, left accent bars, arrows and one highlighted phrase per headline: indigo #4F46E5 (orchestration, requests), blue #2563EB (diagnosis), amber #B45309 (changes that need approval), cyan #0E7490 (the custom agent), steel-blue #0369A1 (results and tool calls, dashed). Fills on cards are very pale tints of the same colours; never a saturated block.
 - Diagram cards: white fill, a solid 3 px outline in dark slate #334155, 12 px radius, a 6 px coloured left accent bar, and the name in bold. Cards must read as solid boxes, not hairline frames. Arrows are 3 px, with a filled triangular head about 14 px long at the destination only: solid indigo for requests and delegation, dashed steel-blue for results. No double-headed arrows anywhere.
-- Screenshots: the crops in `docs/screenshots/crops/` are placed as-is, full column width, inside a card with the same 3 px slate outline and 12 px radius, never scaled so that their text falls below about 22 px on the page, never re-cropped, recoloured or annotated. Each has a one-line caption in secondary text directly beneath it.
+- Screenshots: the crops in `docs/screenshots/crops/` are placed as-is, full column width, inside a card with the same 3 px slate outline and 12 px radius, never re-cropped, recoloured or annotated. The console crops are cut so that the AWS header, the service breadcrumb and the left navigation stay visible: the page must read as the AWS console, and the kagent crops keep the kagent navigation bar for the same reason. Screenshot text may be smaller than body text; the caption beneath each one carries the facts.
 - Code cards: a dark card #1E293B with light text, a header line in the card naming the file, no line numbers, and the lines named under each excerpt highlighted with a faint amber band. Keep the YAML indentation exactly as given. Comments after `#` are part of the excerpt.
 - A small person-and-check mark means "a human approves before this runs"; it appears only where the text says so.
 - Technology marks: the cover carries three badges for Amazon EKS, kagent and kmcp. Use each project's official mark unaltered, at the same height, on a white badge with the name beside it. If a mark is not available, use a text badge with the name only. No other logos anywhere.
@@ -281,7 +281,7 @@ spec:
 
 Highlight the two `type: Agent` lines.
 
-Small diagram under the card: card `sre-orchestrator` (indigo) with a solid indigo arrow labelled `tool call over A2A` to card `cluster-troubleshooter` (blue), and a separate dashed steel-blue arrow back labelled `answer = tool result`.
+Screenshot card: `docs/screenshots/crops/k9s-agents-six.png`. Caption: `k9s, Agent resources: six of the seven agents before the orchestrator was added. incident-reporter is the BYO container; runbook-assistant was not yet accepted (page 7).`
 
 Three bullets:
 
@@ -343,15 +343,14 @@ One line under the grid, secondary text: `The five faults: bad image · crash lo
 
 ### Page 12 · on the cluster
 
-Kicker: `EVIDENCE · THE LIVE SYSTEM`
+Kicker: `EVIDENCE · ON AWS`
 
-Headline: `What the cluster looked like` (highlight "the cluster" in indigo)
+Headline: `What it looked like on AWS` (highlight "on AWS" in amber)
 
-Three screenshot cards stacked, full width, each with its caption:
+Two screenshot cards stacked, full width, each with its caption:
 
-1. `docs/screenshots/crops/eks-nodes-two.png`. Caption: `Amazon EKS console: the two t3.xlarge on-demand nodes in ap-south-1, three minutes after creation.`
-2. `docs/screenshots/crops/k9s-agents-six.png`. Caption: `k9s, Agent resources: six of the seven agents before the orchestrator was added. incident-reporter is the BYO container. runbook-assistant was not yet accepted: querydoc had been referenced as RemoteMCPServer instead of Service.`
-3. `docs/screenshots/crops/k9s-mcpservers.png`. Caption: `k9s, MCPServer resources: the two servers kmcp runs, both Ready.`
+1. `docs/screenshots/crops/aws-eks-console-nodes.png`. Caption: `Amazon EKS console, cluster kagent-sre-lab: two t3.xlarge on-demand nodes in ap-south-1, no node health issues, three minutes after creation.`
+2. `docs/screenshots/crops/aws-ecr-console-repos.png`. Caption: `Amazon ECR: the two images built here, incident-reporter-agent and netprobe-mcp, pushed to private repositories in the same region.`
 
 Footnote, secondary text: `Captured on 2026-10-07. The cluster was deleted after the run; the repository keeps every raw response.`
 
@@ -383,7 +382,7 @@ Footer line, secondary text: `Measured on 2026-10-07. kagent 0.9.10 and kmcp 0.3
 - Page 2 has exactly six specialist cards, six arrowheads from the spine, no arrow between two specialists, and two person-and-check marks (release-manager, sre-operator). The caption is two lines and "ap-south-1" is unbroken.
 - Pages 3 to 8: every YAML line matches this file, including the `#` comments. Nothing runs off a page.
 - Diagram cards on pages 2 and 8 have solid 3 px outlines; arrows have filled heads.
-- Six screenshot crops placed unaltered, from `docs/screenshots/crops/`, each with its caption: pages 4, 6, 10 and 12.
+- Six screenshot crops placed unaltered, from `docs/screenshots/crops/`, each with its caption: pages 4, 6, 8, 10 and 12. The two on page 12 show the AWS header and breadcrumb.
 - Page 11 numbers match the README results table.
 - Replace `<ARTICLE_URL>` on page 13 once the article is published; it is also in the post text.
 - Nothing printed that is not in this file.
