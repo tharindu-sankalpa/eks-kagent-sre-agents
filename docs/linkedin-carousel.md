@@ -22,14 +22,14 @@ A first version was generated from an earlier eight-page brief. Keep these fixes
 - Page 3's footnote ran off the page under a 23-line excerpt. Excerpts now start at `spec:` and no page carries more than 16 lines of code.
 - The cover did not say what the system is for or what it is built with. It now does, with the repository URL.
 - The diagram boxes and arrows were hairlines. Cards now have 3 px outlines and arrows are 3 px with solid heads.
-- "Six agents are YAML. One is a container." blurred the two agent types kagent has. The cover now names them, page 2 marks which agent is which, and a new page 4 explains Declarative versus BYO from the resource definition.
-- There was no evidence from the live system. Six screenshot crops are now placed on pages 5, 7, 9, 11 and 13, two of them from the AWS console.
+- "Six agents are YAML. One is a container." blurred the two agent types kagent has. The cover now names them, page 2 marks which agent is which, and a new page 5 explains Declarative versus BYO from the resource definition.
+- There was no evidence from the live system. Six screenshot crops are now placed on pages 3, 6, 8, 10 and 12. The two from the AWS console come first, on page 3, so the platform is visible before the YAML.
 
 ---
 
 ## Brief for the design tool
 
-Design a 14-page document for a LinkedIn document post (PDF carousel). Portrait pages, 1080 × 1350 px each. It is read inside the LinkedIn feed at phone width, so everything is large: body text at least 30 px, captions at least 24 px, code at least 24 px. One idea per page. No page has more than one diagram, and no page has more than one code card unless this brief shows two (pages 4 and 6). Use only the text given below; do not add, reword, shorten or invent any sentence, number, file name or YAML line. Do not add decorative illustrations, stock imagery or photographs. If a page does not fit, do not shrink the type below the minimums; report which page overflowed.
+Design a 14-page document for a LinkedIn document post (PDF carousel). Portrait pages, 1080 × 1350 px each. It is read inside the LinkedIn feed at phone width, so everything is large: body text at least 30 px, captions at least 24 px, code at least 24 px. One idea per page. No page has more than one diagram, and no page has more than one code card unless this brief shows two (pages 5 and 7). Use only the text given below; do not add, reword, shorten or invent any sentence, number, file name or YAML line. Do not add decorative illustrations, stock imagery or photographs. If a page does not fit, do not shrink the type below the minimums; report which page overflowed.
 
 ### Style
 
@@ -83,7 +83,20 @@ Caption under the diagram, secondary text, exactly two lines:
 `Amazon EKS 1.34 · 2 × t3.xlarge · ap-south-1`
 `kagent 0.9.10 · kmcp 0.3.0 · models via OpenRouter`
 
-### Page 3 · an agent is a YAML file
+### Page 3 · on the cluster
+
+Kicker: `THE CLUSTER · ON AWS`
+
+Headline: `What it looked like on AWS` (highlight "on AWS" in amber)
+
+Two screenshot cards stacked, full width, each with its caption:
+
+1. `docs/screenshots/crops/aws-eks-console-nodes.png`. Caption: `Amazon EKS console, cluster kagent-sre-lab: two t3.xlarge on-demand nodes in ap-south-1, no node health issues, three minutes after creation.`
+2. `docs/screenshots/crops/aws-ecr-console-repos.png`. Caption: `Amazon ECR: the two images built here, incident-reporter-agent and netprobe-mcp, pushed to private repositories in the same region.`
+
+Footnote, secondary text: `Captured on 2026-10-07. The cluster was deleted after the run; the repository keeps every raw response.`
+
+### Page 4 · an agent is a YAML file
 
 Kicker: `STEP 1 · DEFINE AN AGENT`
 
@@ -113,14 +126,14 @@ Highlight the lines starting `modelConfig:`, `systemMessage:`, `toolNames:` and 
 
 Four bullets, field name in bold:
 
-- **modelConfig** names a ModelConfig resource. Page 5.
-- **systemMessage** is the prompt. Inline here; a ConfigMap or kagent's snippets elsewhere. Page 6.
+- **modelConfig** names a ModelConfig resource. Page 6.
+- **systemMessage** is the prompt. Inline here; a ConfigMap or kagent's snippets elsewhere. Page 7.
 - **toolNames** selects from a server's inventory. kagent-tools offers 124 tools; this agent sees 11.
 - **requireApproval** lists the calls that pause for a human. Six of the operator's 11.
 
 Footnote, secondary text: `kubectl apply creates the Deployment, Service and A2A endpoint. The pod runs kagent's runtime, built on Google ADK. No code.`
 
-### Page 4 · two kinds of agent
+### Page 5 · two kinds of agent
 
 Kicker: `STEP 1 · DECLARATIVE OR BRING YOUR OWN`
 
@@ -172,7 +185,7 @@ Right bullets:
 
 Footnote, secondary text: `Both are the same Agent resource with a different type. Both appear to the orchestrator as tools.`
 
-### Page 5 · the model
+### Page 6 · the model
 
 Kicker: `STEP 1 · THE MODEL`
 
@@ -203,7 +216,7 @@ Two bullets:
 - Every ModelConfig in this build has this shape. Only the name and the model id change.
 - One Secret, `kagent-openrouter`, serves all five. An agent picks its model by name.
 
-### Page 6 · the prompts
+### Page 7 · the prompts
 
 Kicker: `STEP 1 · THE PROMPTS`
 
@@ -238,11 +251,11 @@ systemMessageFrom:
 
 Three bullets:
 
-- **Inline.** `systemMessage` holds the text, as on page 3.
+- **Inline.** `systemMessage` holds the text, as on page 4.
 - **kagent's snippets.** `promptTemplate` makes the text a template; `{{include}}` pulls the methodology kagent ships for its own agents.
 - **A ConfigMap.** `systemMessageFrom` keeps a long prompt as its own object, reviewable in Git without touching the Agent.
 
-### Page 7 · an MCP server
+### Page 8 · an MCP server
 
 Kicker: `STEP 2 · ADD A TOOL SERVER`
 
@@ -274,7 +287,7 @@ Two bullets:
 - `netprobe-mcp` is four network probes written with FastMCP, scaffolded, built and pushed with the kmcp CLI. kmcp turns the resource into a Deployment and a Service.
 - A public stdio package needs no image at all: `fetch` runs on kmcp's default image behind an agentgateway adapter.
 
-### Page 8 · three kinds of tool source
+### Page 9 · three kinds of tool source
 
 Kicker: `STEP 2 · WIRE TOOLS TO AN AGENT`
 
@@ -311,7 +324,7 @@ Three bullets, kind in bold:
 
 Footnote, secondary text: `toolNames is the allow-list. A server's inventory is not the agent's tool set.`
 
-### Page 9 · agents as tools
+### Page 10 · agents as tools
 
 Kicker: `STEP 3 · DELEGATE`
 
@@ -336,7 +349,7 @@ spec:
 
 Highlight the two `type: Agent` lines.
 
-Screenshot card: `docs/screenshots/crops/k9s-agents-six.png`. Caption: `k9s, Agent resources: six of the seven agents before the orchestrator was added. incident-reporter is the BYO container; runbook-assistant was not yet accepted (page 8).`
+Screenshot card: `docs/screenshots/crops/k9s-agents-six.png`. Caption: `k9s, Agent resources: six of the seven agents before the orchestrator was added. incident-reporter is the BYO container; runbook-assistant was not yet accepted (page 9).`
 
 Three bullets:
 
@@ -344,7 +357,7 @@ Three bullets:
 - The specialist keeps its own model, prompt and allowed tools. The orchestrator sees only its description and its answer.
 - The BYO agent, incident-reporter, is called the same way. Its loop is Python; its interface is A2A.
 
-### Page 10 · the approval gate
+### Page 11 · the approval gate
 
 Kicker: `STEP 4 · THE GATE`
 
@@ -363,7 +376,7 @@ Two bullets:
 
 Footnote, secondary text: `Enforced by the runtime, not the prompt. It held when the orchestrator called the operator.`
 
-### Page 11 · one repair, two pauses
+### Page 12 · one repair, two pauses
 
 Kicker: `THE TEST · SCENARIO 15`
 
@@ -381,7 +394,7 @@ Screenshot card: `docs/screenshots/crops/s15-orchestrator-ask-user.png`. Caption
 
 Footnote, secondary text: `62 s of request time across three exchanges (32 + 16 + 14 s), 2 human decisions, 1 patch. Human thinking time not included.`
 
-### Page 12 · the numbers
+### Page 13 · the numbers
 
 Kicker: `RESULTS · ONE CLUSTER, ONE DAY`
 
@@ -395,19 +408,6 @@ Four stat tiles in a 2 × 2 grid, number large in indigo, caption below:
 - `≈ 6 USD` — model spend for the whole day, retries included
 
 One line under the grid, secondary text: `The five faults: bad image · crash loop · OOMKilled · Service with no endpoints · unschedulable pod.`
-
-### Page 13 · on the cluster
-
-Kicker: `EVIDENCE · ON AWS`
-
-Headline: `What it looked like on AWS` (highlight "on AWS" in amber)
-
-Two screenshot cards stacked, full width, each with its caption:
-
-1. `docs/screenshots/crops/aws-eks-console-nodes.png`. Caption: `Amazon EKS console, cluster kagent-sre-lab: two t3.xlarge on-demand nodes in ap-south-1, no node health issues, three minutes after creation.`
-2. `docs/screenshots/crops/aws-ecr-console-repos.png`. Caption: `Amazon ECR: the two images built here, incident-reporter-agent and netprobe-mcp, pushed to private repositories in the same region.`
-
-Footnote, secondary text: `Captured on 2026-10-07. The cluster was deleted after the run; the repository keeps every raw response.`
 
 ### Page 14 · what broke, and where to read
 
@@ -435,9 +435,9 @@ Footer line, secondary text: `Measured on 2026-10-07. kagent 0.9.10 and kmcp 0.3
 - Fourteen pages, portrait, every page numbered n/14.
 - Page 1 names the use case, the three technologies and the repository URL.
 - Page 2 has exactly six specialist cards, six arrowheads from the spine, no arrow between two specialists, and two person-and-check marks (release-manager, sre-operator). The caption is two lines and "ap-south-1" is unbroken.
-- Pages 3 to 9: every YAML line matches this file, including the `#` comments. Nothing runs off a page.
+- Pages 4 to 10: every YAML line matches this file, including the `#` comments. Nothing runs off a page.
 - Diagram cards on page 2 have solid 3 px outlines; arrows have filled heads.
-- Six screenshot crops placed unaltered, from `docs/screenshots/crops/`, each with its caption: pages 5, 7, 9, 11 and 13. The two on page 13 show the AWS header and breadcrumb.
+- Six screenshot crops placed unaltered, from `docs/screenshots/crops/`, each with its caption: pages 3, 6, 8, 10 and 12. The two on page 3 show the AWS header and breadcrumb.
 - Page 11 numbers match the README results table.
 - Replace `<ARTICLE_URL>` on page 14 once the article is published; it is also in the post text.
 - Nothing printed that is not in this file.
