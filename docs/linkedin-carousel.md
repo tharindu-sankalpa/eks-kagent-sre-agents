@@ -9,9 +9,9 @@ Repository: https://github.com/tharindu-sankalpa/eks-kagent-sre-agents
 Give the design tool this file and, if it can read the repository, the repository itself. Then:
 
 1. Check every page against this file: numbers, names, YAML lines, arrow directions. The tool must not add facts.
-2. Export as PDF, 13 pages, 1080 × 1350 px (4:5 portrait), no margins beyond the page's own padding.
+2. Export as PDF, 14 pages, 1080 × 1350 px (4:5 portrait), no margins beyond the page's own padding.
 3. Name the file `multi-agent-sre-on-eks.pdf`. LinkedIn shows the file name as the document title in the feed.
-4. Post it with the text from [linkedin-post.md](linkedin-post.md). Links inside the PDF are not clickable on LinkedIn, so the article and repo URLs go in the post text, and pages 1 and 13 write the repo URL out plainly.
+4. Post it with the text from [linkedin-post.md](linkedin-post.md). Links inside the PDF are not clickable on LinkedIn, so the article and repo URLs go in the post text, and pages 1 and 14 write the repo URL out plainly.
 
 ## What the first version got wrong
 
@@ -22,18 +22,19 @@ A first version was generated from an earlier eight-page brief. Keep these fixes
 - Page 3's footnote ran off the page under a 23-line excerpt. Excerpts now start at `spec:` and no page carries more than 16 lines of code.
 - The cover did not say what the system is for or what it is built with. It now does, with the repository URL.
 - The diagram boxes and arrows were hairlines. Cards now have 3 px outlines and arrows are 3 px with solid heads.
-- There was no evidence from the live system. Six screenshot crops are now placed on pages 4, 6, 8, 10 and 12, two of them from the AWS console.
+- "Six agents are YAML. One is a container." blurred the two agent types kagent has. The cover now names them, page 2 marks which agent is which, and a new page 4 explains Declarative versus BYO from the resource definition.
+- There was no evidence from the live system. Six screenshot crops are now placed on pages 5, 7, 9, 11 and 13, two of them from the AWS console.
 
 ---
 
 ## Brief for the design tool
 
-Design a 13-page document for a LinkedIn document post (PDF carousel). Portrait pages, 1080 × 1350 px each. It is read inside the LinkedIn feed at phone width, so everything is large: body text at least 30 px, captions at least 24 px, code at least 24 px. One idea per page. No page has more than one diagram, and no page has more than one code card unless this brief shows two. Use only the text given below; do not add, reword, shorten or invent any sentence, number, file name or YAML line. Do not add decorative illustrations, stock imagery or photographs. If a page does not fit, do not shrink the type below the minimums; report which page overflowed.
+Design a 14-page document for a LinkedIn document post (PDF carousel). Portrait pages, 1080 × 1350 px each. It is read inside the LinkedIn feed at phone width, so everything is large: body text at least 30 px, captions at least 24 px, code at least 24 px. One idea per page. No page has more than one diagram, and no page has more than one code card unless this brief shows two (pages 4 and 6). Use only the text given below; do not add, reword, shorten or invent any sentence, number, file name or YAML line. Do not add decorative illustrations, stock imagery or photographs. If a page does not fit, do not shrink the type below the minimums; report which page overflowed.
 
 ### Style
 
 - Canvas #FAFAFA. Text #0F172A, secondary text #475569. A thin rule in #4F46E5 across the top of every page.
-- Each page has three fixed elements: a small-caps kicker in indigo #4F46E5 at the top left (letter-spaced, about 24 px), a bold headline below it (about 60 px, two lines at most), and a page number "n/13" bottom right in secondary text.
+- Each page has three fixed elements: a small-caps kicker in indigo #4F46E5 at the top left (letter-spaced, about 24 px), a bold headline below it (about 60 px, two lines at most), and a page number "n/14" bottom right in secondary text.
 - Typeface: one clean sans-serif such as Inter for everything except code; a monospace such as JetBrains Mono for code. Consistent sizes across pages.
 - Accent colours, used only for small marks, left accent bars, arrows and one highlighted phrase per headline: indigo #4F46E5 (orchestration, requests), blue #2563EB (diagnosis), amber #B45309 (changes that need approval), cyan #0E7490 (the custom agent), steel-blue #0369A1 (results and tool calls, dashed). Fills on cards are very pale tints of the same colours; never a saturated block.
 - Diagram cards: white fill, a solid 3 px outline in dark slate #334155, 12 px radius, a 6 px coloured left accent bar, and the name in bold. Cards must read as solid boxes, not hairline frames. Arrows are 3 px, with a filled triangular head about 14 px long at the destination only: solid indigo for requests and delegation, dashed steel-blue for results. No double-headed arrows anywhere.
@@ -53,7 +54,7 @@ Standfirst, one paragraph in secondary text, about 34 px: `An orchestrator uses 
 
 Three numbered lines, large numerals in indigo:
 
-1. **Six agents are YAML. One is a container.** A model, instructions and allowed tools per agent.
+1. **Six agents are declarative, one is bring-your-own.** Declarative: YAML that kagent's runtime executes. BYO: a container that speaks A2A.
 2. **The orchestrator's tools are the other agents.** It has no Kubernetes tools of its own.
 3. **Every change pauses for a human.** The gate held even when one agent called another.
 
@@ -75,6 +76,8 @@ Diagram, top to bottom, centred:
 - Row 2: one indigo line leaves the bottom of the orchestrator to a horizontal spine labelled `A2A delegation · agents as tools`. From the spine, six separate branches go down, each ending with one arrowhead on the top of its own card. Six small cards in two rows of three, in this order: `cluster-troubleshooter` (blue), `observability-analyst` (teal #0F766E), `runbook-assistant` (violet #7C3AED); `release-manager` (amber, person-and-check mark), `incident-reporter` (cyan, dashed outline), `sre-operator` (amber, person-and-check mark). No arrow joins two specialist cards.
 - Row 3: one dashed steel-blue arrow from below the six cards to one wide amber-accent card `5 MCP tool servers`, caption `kagent-tools · grafana-mcp · netprobe-mcp · fetch · querydoc`.
 - Row 4: one dashed steel-blue arrow to a plain card `Kubernetes API · Prometheus · Grafana`.
+
+Under the six cards, inside the specialist group, one line in secondary text: `Solid cards: declarative agents on kagent's runtime. Dashed card: bring-your-own container. The orchestrator is declarative too.`
 
 Caption under the diagram, secondary text, exactly two lines:
 `Amazon EKS 1.34 · 2 × t3.xlarge · ap-south-1`
@@ -110,14 +113,66 @@ Highlight the lines starting `modelConfig:`, `systemMessage:`, `toolNames:` and 
 
 Four bullets, field name in bold:
 
-- **modelConfig** names a ModelConfig resource. Page 4.
-- **systemMessage** is the prompt. Inline here; a ConfigMap or kagent's snippets elsewhere. Page 5.
+- **modelConfig** names a ModelConfig resource. Page 5.
+- **systemMessage** is the prompt. Inline here; a ConfigMap or kagent's snippets elsewhere. Page 6.
 - **toolNames** selects from a server's inventory. kagent-tools offers 124 tools; this agent sees 11.
 - **requireApproval** lists the calls that pause for a human. Six of the operator's 11.
 
-Footnote, secondary text: `kubectl apply creates the Deployment, Service and A2A endpoint. No code.`
+Footnote, secondary text: `kubectl apply creates the Deployment, Service and A2A endpoint. The pod runs kagent's runtime, built on Google ADK. No code.`
 
-### Page 4 · the model
+### Page 4 · two kinds of agent
+
+Kicker: `STEP 1 · DECLARATIVE OR BRING YOUR OWN`
+
+Headline: `Two kinds of agent, one resource` (highlight "one resource" in indigo)
+
+Two columns, each a card with a heading, a short code excerpt and three bullets. Left column indigo accent, right column cyan #0E7490 accent with a dashed outline, matching the agent cards on page 2.
+
+Left heading: `type: Declarative` · caption `six agents here, including the orchestrator`
+
+Left code card, header `infra/kagent/agents/sre-operator.yaml · shortened`:
+
+```yaml
+spec:
+  type: Declarative
+  declarative:
+    modelConfig: grok-4-7
+    systemMessage: |
+      ...
+    tools: [...]
+    # runtime: go   # python is the default
+```
+
+Left bullets:
+
+- You write the YAML. The controller creates the Deployment, Service and A2A endpoint.
+- The pod runs kagent's runtime, built on Google ADK. `runtime` picks the Python ADK (default) or the Go ADK.
+- MCP tools, A2A, sessions and the approval gate come with the runtime.
+
+Right heading: `type: BYO` · caption `one agent here: incident-reporter`
+
+Right code card, header `infra/kagent/agents/incident-reporter.yaml · shortened`:
+
+```yaml
+spec:
+  type: BYO
+  byo:
+    deployment:
+      image: <ECR>/incident-reporter-agent:0.1.0
+      env:
+        - name: KAGENT_TOOLS_URL
+          value: http://kagent-tools.kagent:8084/mcp
+```
+
+Right bullets:
+
+- You point at an image. kagent deploys it and calls it like any other agent.
+- The contract is one thing: serve A2A on port 8080. The model, prompt and loop live in the image.
+- Any framework that speaks A2A: Google ADK, LangGraph and CrewAI are in kagent's examples. Here it is a plain Python loop with the A2A SDK.
+
+Footnote, secondary text: `Both are the same Agent resource with a different type. Both appear to the orchestrator as tools.`
+
+### Page 5 · the model
 
 Kicker: `STEP 1 · THE MODEL`
 
@@ -148,7 +203,7 @@ Two bullets:
 - Every ModelConfig in this build has this shape. Only the name and the model id change.
 - One Secret, `kagent-openrouter`, serves all five. An agent picks its model by name.
 
-### Page 5 · the prompts
+### Page 6 · the prompts
 
 Kicker: `STEP 1 · THE PROMPTS`
 
@@ -187,7 +242,7 @@ Three bullets:
 - **kagent's snippets.** `promptTemplate` makes the text a template; `{{include}}` pulls the methodology kagent ships for its own agents.
 - **A ConfigMap.** `systemMessageFrom` keeps a long prompt as its own object, reviewable in Git without touching the Agent.
 
-### Page 6 · an MCP server
+### Page 7 · an MCP server
 
 Kicker: `STEP 2 · ADD A TOOL SERVER`
 
@@ -219,7 +274,7 @@ Two bullets:
 - `netprobe-mcp` is four network probes written with FastMCP, scaffolded, built and pushed with the kmcp CLI. kmcp turns the resource into a Deployment and a Service.
 - A public stdio package needs no image at all: `fetch` runs on kmcp's default image behind an agentgateway adapter.
 
-### Page 7 · three kinds of tool source
+### Page 8 · three kinds of tool source
 
 Kicker: `STEP 2 · WIRE TOOLS TO AN AGENT`
 
@@ -256,7 +311,7 @@ Three bullets, kind in bold:
 
 Footnote, secondary text: `toolNames is the allow-list. A server's inventory is not the agent's tool set.`
 
-### Page 8 · agents as tools
+### Page 9 · agents as tools
 
 Kicker: `STEP 3 · DELEGATE`
 
@@ -281,15 +336,15 @@ spec:
 
 Highlight the two `type: Agent` lines.
 
-Screenshot card: `docs/screenshots/crops/k9s-agents-six.png`. Caption: `k9s, Agent resources: six of the seven agents before the orchestrator was added. incident-reporter is the BYO container; runbook-assistant was not yet accepted (page 7).`
+Screenshot card: `docs/screenshots/crops/k9s-agents-six.png`. Caption: `k9s, Agent resources: six of the seven agents before the orchestrator was added. incident-reporter is the BYO container; runbook-assistant was not yet accepted (page 8).`
 
 Three bullets:
 
 - kagent exposes every agent over A2A. Listing one as `type: Agent` makes it callable like any other tool.
 - The specialist keeps its own model, prompt and allowed tools. The orchestrator sees only its description and its answer.
-- The custom container agent is called the same way. Its loop is Python; its interface is A2A.
+- The BYO agent, incident-reporter, is called the same way. Its loop is Python; its interface is A2A.
 
-### Page 9 · the approval gate
+### Page 10 · the approval gate
 
 Kicker: `STEP 4 · THE GATE`
 
@@ -308,7 +363,7 @@ Two bullets:
 
 Footnote, secondary text: `Enforced by the runtime, not the prompt. It held when the orchestrator called the operator.`
 
-### Page 10 · one repair, two pauses
+### Page 11 · one repair, two pauses
 
 Kicker: `THE TEST · SCENARIO 15`
 
@@ -326,7 +381,7 @@ Screenshot card: `docs/screenshots/crops/s15-orchestrator-ask-user.png`. Caption
 
 Footnote, secondary text: `62 s of request time across three exchanges (32 + 16 + 14 s), 2 human decisions, 1 patch. Human thinking time not included.`
 
-### Page 11 · the numbers
+### Page 12 · the numbers
 
 Kicker: `RESULTS · ONE CLUSTER, ONE DAY`
 
@@ -341,7 +396,7 @@ Four stat tiles in a 2 × 2 grid, number large in indigo, caption below:
 
 One line under the grid, secondary text: `The five faults: bad image · crash loop · OOMKilled · Service with no endpoints · unschedulable pod.`
 
-### Page 12 · on the cluster
+### Page 13 · on the cluster
 
 Kicker: `EVIDENCE · ON AWS`
 
@@ -354,7 +409,7 @@ Two screenshot cards stacked, full width, each with its caption:
 
 Footnote, secondary text: `Captured on 2026-10-07. The cluster was deleted after the run; the repository keeps every raw response.`
 
-### Page 13 · what broke, and where to read
+### Page 14 · what broke, and where to read
 
 Kicker: `LIMITS · AND THE REPO`
 
@@ -377,12 +432,12 @@ Footer line, secondary text: `Measured on 2026-10-07. kagent 0.9.10 and kmcp 0.3
 
 ## Checklist before posting
 
-- Thirteen pages, portrait, every page numbered n/13.
+- Fourteen pages, portrait, every page numbered n/14.
 - Page 1 names the use case, the three technologies and the repository URL.
 - Page 2 has exactly six specialist cards, six arrowheads from the spine, no arrow between two specialists, and two person-and-check marks (release-manager, sre-operator). The caption is two lines and "ap-south-1" is unbroken.
-- Pages 3 to 8: every YAML line matches this file, including the `#` comments. Nothing runs off a page.
-- Diagram cards on pages 2 and 8 have solid 3 px outlines; arrows have filled heads.
-- Six screenshot crops placed unaltered, from `docs/screenshots/crops/`, each with its caption: pages 4, 6, 8, 10 and 12. The two on page 12 show the AWS header and breadcrumb.
+- Pages 3 to 9: every YAML line matches this file, including the `#` comments. Nothing runs off a page.
+- Diagram cards on page 2 have solid 3 px outlines; arrows have filled heads.
+- Six screenshot crops placed unaltered, from `docs/screenshots/crops/`, each with its caption: pages 5, 7, 9, 11 and 13. The two on page 13 show the AWS header and breadcrumb.
 - Page 11 numbers match the README results table.
-- Replace `<ARTICLE_URL>` on page 13 once the article is published; it is also in the post text.
+- Replace `<ARTICLE_URL>` on page 14 once the article is published; it is also in the post text.
 - Nothing printed that is not in this file.

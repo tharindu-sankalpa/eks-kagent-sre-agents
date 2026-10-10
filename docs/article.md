@@ -68,6 +68,8 @@ The controller and the agent runtime have separate jobs. The controller reconcil
 
 All six declarative agents ultimately ran on Python. The Go runtime was attempted, but the chart's pinned image digest was unavailable. The custom seventh agent uses its own loop and the A2A SDK; it does not use Google ADK.
 
+The `Agent` resource has two types. `type: Declarative` is the YAML shown below: the controller creates the Deployment, and the pod runs kagent's runtime, built on Google ADK; the `runtime` field selects the Python ADK (the default) or the Go ADK. `type: BYO` replaces the model, instructions and tools with a container image, and the only contract is that the image serves A2A on port 8080. Any framework that speaks A2A fits: kagent's examples use Google ADK, LangGraph and CrewAI, and this build uses a plain Python loop. The two types mix freely. Here the five specialists that need only tools and instructions, and the orchestrator, are declarative; the incident reporter, which needs its own control flow, is BYO. Both appear to the orchestrator as `type: Agent` tools. [Resource definition](https://github.com/kagent-dev/kagent/blob/v0.9.10/go/api/v1alpha2/agent_types.go), [BYO examples](https://kagent.dev/docs/kagent/examples/).
+
 ### kmcp: running tool servers on Kubernetes
 
 kmcp manages MCP servers rather than agent conversations. Its CLI scaffolds, builds and deploys projects. Its controller turns an `MCPServer` resource into a Deployment, Service, ConfigMap and ServiceAccount.

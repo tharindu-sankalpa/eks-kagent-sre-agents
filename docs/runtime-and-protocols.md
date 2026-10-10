@@ -30,7 +30,7 @@ This reference explains the layers beneath the [multi-agent SRE workflow](articl
 
 The pinned kagent Python package declares `google-adk>=1.28.1,<2`. That is a source dependency range, not a measurement of the package version installed in the running image. Its executor imports ADK's `Runner`; its approval callback uses `ToolContext.request_confirmation()`. [Dependency declaration](https://github.com/kagent-dev/kagent/blob/v0.9.10/python/packages/kagent-adk/pyproject.toml), [executor](https://github.com/kagent-dev/kagent/blob/v0.9.10/python/packages/kagent-adk/src/kagent/adk/_agent_executor.py), [approval implementation](https://github.com/kagent-dev/kagent/blob/v0.9.10/python/packages/kagent-adk/src/kagent/adk/_approval.py).
 
-kagent also offers a Go runtime. This build attempted it but ultimately used Python because the chart's Go image digest could not be pulled. Describing this project as ADK-based therefore applies to the declarative Python agents, not to every possible kagent runtime or the custom incident reporter.
+kagent also offers a Go runtime: the declarative `runtime` field selects `python` (default, described in the v0.9.10 source as the full feature set) or `go` (faster start-up, most features). This build attempted it but ultimately used Python because the chart's Go image digest could not be pulled. Describing this project as ADK-based therefore applies to the declarative Python agents, not to every possible kagent runtime or the custom incident reporter.
 
 ## Agent configuration and approval
 
@@ -42,7 +42,7 @@ kagent also offers a Go runtime. This build attempted it but ultimately used Pyt
 | `RemoteMCPServer` | Protocol and URL of an existing MCP endpoint | Discovered tools recorded in resource status |
 | `MCPServer` | Image/package command, transport and port | A server deployed by kmcp |
 | Declarative `Agent` | Model reference, instructions, selected tools, optional deployment resources | Agent Deployment, Service and A2A access |
-| BYO `Agent` | Container image and environment | Custom agent deployed through the same platform |
+| BYO `Agent` | Container image and environment; the image must serve A2A on port 8080 | Custom agent deployed through the same platform; any framework that speaks A2A (kagent's examples: Google ADK, LangGraph, CrewAI) |
 
 kagent supports providers including OpenAI, Anthropic, Azure OpenAI, Gemini, Vertex AI, Bedrock and Ollama. This build uses only the `OpenAI` provider with `baseUrl: https://openrouter.ai/api/v1`. The chart creates `default-model-config`; four files in [infra/kagent/models/](../infra/kagent/models/) create the other configurations. Each references `kagent-openrouter` and the `OPENROUTER_API_KEY` key.
 
