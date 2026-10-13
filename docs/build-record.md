@@ -2,6 +2,8 @@
 
 This is the chronological record of the build and tests on 2026-10-07. It preserves the commands, recorded outputs, screenshots, failed attempts and fixes. Use the [setup guide](setup-guide.md) for the current dependency order and copyable commands; this record includes actions that were later corrected.
 
+A dated [web UI validation follow-up](#follow-up-web-ui-validation-2026-10-13) records the operator's later walkthrough on 2026-10-13.
+
 The original step numbers are retained so investigations and evidence remain easy to locate. Outputs are historical observations, not guarantees for a new run. The source checkouts were used for inspection; they are not prerequisites for deploying the published charts.
 
 ## Reading this record
@@ -17,6 +19,7 @@ The original step numbers are retained so investigations and evidence remain eas
 - [Scenario results](#15-the-scenarios)
 - [Orchestrator timeout, memory failure and delegated approval](#16-the-orchestrator-over-messagestream)
 - [Recorded teardown](#teardown)
+- [Follow-up web UI validation (2026-10-13)](#follow-up-web-ui-validation-2026-10-13)
 
 ## Conventions
 
@@ -937,3 +940,20 @@ $ aws ecr describe-repositories --region $AWS_REGION --query 'repositories[].rep
 ```
 
 Also remove the context from your default kubeconfig if you added it: `kubectl config delete-context kagent-sre-lab`.
+
+## Follow-up: web UI validation (2026-10-13)
+
+The operator reported following the updated setup guide and that all of the section 12 web UI examples worked. Seven screenshots supplied with that report show the UI reached through `http://127.0.0.1:8080`, with these observations:
+
+| Flow | Evidence visible in the supplied screenshots |
+|---|---|
+| `cluster-troubleshooter`: diagnose `api` | Completed tool calls and a final diagnosis of `ImagePullBackOff`, citing the nonexistent `nginx:1.99.99-does-not-exist` tag and pull event |
+| `cluster-troubleshooter`: diagnose `worker` | A final diagnosis explaining the deliberately failing command, exit code 1 and the log line `config file /etc/worker/config.yaml not found` |
+| `observability-analyst`: node usage | A response reporting CPU and memory usage for both nodes and concluding that they were lightly loaded |
+| `sre-orchestrator`: pressure and restarts | A completed troubleshooter delegation and final answer combining observability and workload evidence, distinguishing a container memory limit from node pressure |
+| `sre-operator`: scaling decision | An orange `k8s_scale` card marked **Approval required**, with `name: web`, `namespace: demo-broken`, `replicas: 2`, **Approve/Reject** buttons and **Awaiting approval…** status |
+| `sre-orchestrator`: repair `checkout` | Completed troubleshooter delegation, followed by **Questions for you** offering a selector patch to `app=web` and stating that the operator will ask for its own approval next |
+
+The UI exposes tool **Arguments/Results** and delegated agent **Input/Output/Activity** sections, so a reader can inspect the evidence during the conversation. Repair involves selecting an answer and clicking **Submit**, followed by a separate tool-execution approval. The setup guide now describes these controls explicitly.
+
+The report covers successful completion of the walkthrough, including approval/rejection and repair. The supplied captures show the decision prompts rather than the final replica and endpoint checks; those final outcomes are operator-reported. No new wall-clock timings, per-scenario costs or complete API transcripts were supplied. The 2026-10-07 benchmark tables and scenario 13 failure remain historical results, and the Postman collection has not been reported as executed in this follow-up.

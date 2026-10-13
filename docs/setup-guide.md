@@ -2,7 +2,7 @@
 
 This guide deploys seven agents: an orchestrator that uses six specialists as tools, including one custom incident reporter. kagent runs the declarative agents and supplies operational tools; kmcp deploys additional Model Context Protocol (MCP) servers. The tests cover diagnosis, delegated repair and human approval before changes.
 
-The steps follow the dependencies of the committed manifests. They have been reconstructed from the final configuration and the 2026-10-07 build; this reordered procedure has not been rerun on a new cluster. The [build record](build-record.md) preserves every original command, output, screenshot and investigation. The [article](article.md) explains the workflow; the [runtime reference](runtime-and-protocols.md) explains the underlying interfaces.
+The steps are ordered so each one has what it needs from the one before. They were rebuilt from the final configuration and the 2026-10-07 build. On 2026-10-13, the operator reported following the guide and successfully completing the section 12 web UI walkthrough; the [follow-up record](build-record.md#follow-up-web-ui-validation-2026-10-13) describes the supplied screenshot evidence. For more detail, see the [build record](build-record.md) (original commands, outputs and investigations), the [article](article.md) (how the workflow works) and the [runtime reference](runtime-and-protocols.md) (how the pieces talk to each other).
 
 The cluster is created from an `eksctl` file. Helm installs the platform and monitoring; `kubectl apply` creates model, agent and tool resources. No agent is created manually in the UI. The custom server and agent images are built locally and pushed to ECR.
 
@@ -63,6 +63,8 @@ test -f "$REPO_ROOT/infra/eks/cluster.yaml"
 test -f .env || cp .env.example .env
 ```
 
+The first `test -f` checks that the cluster manifest exists. The second creates `.env` from `.env.example` only if `.env` is missing (`||` means “if the check fails”).
+
 After editing `.env`, initialize the deployment shell:
 
 ```bash
@@ -79,7 +81,9 @@ export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output tex
 export ECR_REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
 ```
 
-`.env` and `.kube/` are gitignored. The dedicated kubeconfig keeps these commands pointed at the lab cluster. Use the same absolute `KUBECONFIG` in every terminal used below.
+`set -a` automatically exports variables loaded by `. "$REPO_ROOT/.env"` into the current shell; `set +a` turns automatic exporting off. The two `: "${…:?…}"` checks report an error if either required value is missing or empty.
+
+`.env` and `.kube/` are gitignored. The dedicated kubeconfig keeps these commands pointed at the lab cluster. Use the same absolute `KUBECONFIG` in every terminal used below; k9s can also use it when launched from that shell. Step 1 shows how to add the cluster to your default kubeconfig for access from other terminals.
 
 Check authentication, versions and quota before provisioning:
 
@@ -107,11 +111,31 @@ The add-ons include the EBS CSI driver and EKS Pod Identity agent. `autoApplyPod
 
 ```bash
 eksctl create cluster -f infra/eks/cluster.yaml --kubeconfig "$KUBECONFIG"
+```
+
+If the cluster already exists, skip creation and load its connection details into the repo's kubeconfig:
+
+```bash
+aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER" --kubeconfig "$KUBECONFIG"
+```
+
+For either path, check the nodes and add-ons:
+
+```bash
 kubectl get nodes
 aws eks list-addons --region "$AWS_REGION" --cluster-name "$CLUSTER" --output text
 ```
 
 Continue when both nodes are Ready and all six add-ons are installed. The original cluster took approximately 15–20 minutes to finish. If the command returns `ExpiredToken`, use the [recorded recovery](build-record.md#3-eks-cluster): refresh credentials, inspect completed stacks, write the kubeconfig and add only missing add-ons. Do not assume the reported CLI failure means nothing was created.
+
+Once the cluster exists, optionally add it to your default kubectl contexts for access outside this repo:
+
+```bash
+aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER" --kubeconfig "$HOME/.kube/config"
+KUBECONFIG="$HOME/.kube/config" k9s
+```
+
+This saves the context in `~/.kube/config` and makes it that file's current context. The explicit path overrides the guide's exported `KUBECONFIG`; without it, `update-kubeconfig` would update the repo's config. The second command uses the default file for k9s only. In terminals without `KUBECONFIG` set, `kubectl` and k9s use the default file automatically. See the [AWS CLI reference](https://docs.aws.amazon.com/cli/latest/reference/eks/update-kubeconfig.html).
 
 ## 2. Set the default StorageClass
 
@@ -234,35 +258,81 @@ These faults are the known answers for the diagnosis tests. Kubernetes status ma
 
 ## 8. Build and deploy the custom MCP server
 
-The four probe implementations are already in [byo/netprobe-mcp/](../byo/netprobe-mcp/). Use that directory; do not scaffold a second project for deployment. The original `kmcp init` command and generated-file details are preserved in the [build record](build-record.md#10-bring-your-own-mcp-server-scaffold-build-push-deploy).
+This step runs our custom `netprobe-mcp` server inside EKS so agents can check the network from inside the cluster. It exposes four MCP tools: `dns_lookup` resolves a hostname, `tcp_connect` checks a port, `http_check` checks an HTTP response, and `tls_cert_expiry` checks a TLS certificate. The Python implementations are already in [byo/netprobe-mcp/](../byo/netprobe-mcp/).
 
-First check the local implementation:
+### What is kmcp, and where does `kmcp init` fit?
+
+[kmcp](https://github.com/kagent-dev/kmcp/tree/v0.3.0) has two parts: a **CLI on your computer** for creating and packaging MCP projects, and a **controller in Kubernetes** that turns `MCPServer` resources into running Deployments and Services. Step 6 installed the controller; these commands use the local v0.3.0 CLI.
+
+| Command | What it does | Use in this guide |
+|---|---|---|
+| `kmcp init python netprobe-mcp` | Creates a starter Python/FastMCP project: source files, an example tool, tests, `pyproject.toml`, `kmcp.yaml` and a Dockerfile | Already done; use the committed project |
+| `kmcp build --tag …` | Builds a container image from the project's Dockerfile | Run below after testing |
+| `kmcp build --tag … --push` | Builds the image, then uploads it to the registry named in the tag | Upload to Amazon ECR below |
+| `kmcp deploy` | Creates/applies an `MCPServer` resource for the controller to deploy | Here we apply the committed YAML with `kubectl` instead |
+
+`init` only creates the starter project. We replaced its example tool with the four probes; the full original command and generated-file details are in the [build record](build-record.md#101-scaffold-with-kmcp-init). When following this guide, continue with the existing directory below.
+
+### How do fetch and agentgateway relate to this server?
+
+[infra/kmcp/fetch-mcpserver.yaml](../infra/kmcp/fetch-mcpserver.yaml), applied in step 7, is the Kubernetes deployment description for a separate server named `fetch`. It runs the public [`mcp-server-fetch` package](https://github.com/modelcontextprotocol/servers/tree/main/src/fetch), whose tool retrieves a URL's page content so an agent can read documentation or runbooks. The filename describes the manifest; the package supplies the tool.
+
+Fetch communicates over **stdio**: its parent process sends MCP messages through standard input and receives replies through standard output. That is a local process connection. Other pods need a network endpoint, so kmcp adds **agentgateway**, a proxy that starts the fetch process and bridges HTTP MCP requests to its stdio connection. The fetch manifest uses `uvx mcp-server-fetch`; kmcp supplies a default image containing uv, so you do not build a custom image for fetch.
+
+Our netprobe server uses FastMCP to serve MCP over **HTTP itself**, so its manifest uses `transportType: http` and needs no agentgateway adapter. The two request paths are:
+
+```text
+fetch:        kagent → HTTP → agentgateway → stdio → mcp-server-fetch
+netprobe-mcp: kagent → HTTP → FastMCP → our Python probe functions
+```
+
+Both are managed by kmcp. Fetch retrieves page content; netprobe returns network diagnostic evidence. This step builds only netprobe's image.
+
+### Test the existing project locally
 
 ```bash
 (cd "$REPO_ROOT/byo/netprobe-mcp" && uv sync && uv run pytest -q)
 ```
 
-The original run passed ten tests with two warnings in 0.94 s. The [component README](../byo/netprobe-mcp/README.md) also describes running HTTP/stdio locally. Recorded direct MCP checks are in [results/raw/netprobe-local-mcp-test.txt](../results/raw/netprobe-local-mcp-test.txt).
+`uv sync` installs the project's dependencies; `uv run pytest -q` runs its tests. The subshell returns you to the repository root afterward. The original run passed ten tests with two warnings in 0.94 s. The [component README](../byo/netprobe-mcp/README.md#run-locally) explains how to start the server locally; [recorded MCP client calls](../results/raw/netprobe-local-mcp-test.txt) show the four tools being listed and exercised.
 
-For a new lab, create the ECR repository and authenticate Docker. If you retained it from a previous lab, reuse it and skip creation.
+### Build the image and push it to ECR
+
+Amazon ECR stores the image that the EKS nodes will download. For a new lab, create the `netprobe-mcp` repository. Skip this command if that ECR repository already exists:
 
 ```bash
 aws ecr create-repository --region "$AWS_REGION" --repository-name netprobe-mcp \
   --image-scanning-configuration scanOnPush=true
+```
+
+Authenticate Docker to ECR, then build and upload the image from the project directory:
+
+```bash
 aws ecr get-login-password --region "$AWS_REGION" | \
   docker login --username AWS --password-stdin "$ECR_REGISTRY"
 (cd "$REPO_ROOT/byo/netprobe-mcp" && \
   kmcp build --platform linux/amd64 --tag "$ECR_REGISTRY/netprobe-mcp:0.1.0" --push)
+```
+
+`--platform linux/amd64` builds for the EKS workers' x86_64 CPUs, including when your laptop uses Apple Silicon. `--tag` specifies the ECR registry, repository and image version (`0.1.0`). `--push` uploads the finished image after building; it does not deploy it to Kubernetes. The original pushed image was 98 MB.
+
+### Deploy the uploaded image to EKS
+
+[infra/kmcp/netprobe-mcpserver.yaml](../infra/kmcp/netprobe-mcpserver.yaml) describes which image to run and how to expose it. Replace its `<ACCOUNT_ID>` placeholder in the input sent to `kubectl`, then apply it:
+
+```bash
 sed "s/<ACCOUNT_ID>/$AWS_ACCOUNT_ID/" infra/kmcp/netprobe-mcpserver.yaml | kubectl apply -f -
 kubectl -n kagent rollout status deploy/netprobe-mcp --timeout=300s
 kubectl -n kagent get mcpserver netprobe-mcp
 ```
 
-The platform flag produces x86_64 images for the workers, including when building on Apple Silicon. The original pushed image was 98 MB. The HTTP transport runs FastMCP directly at `http://netprobe-mcp.kagent:3000/mcp`; no agentgateway adapter is added. Its four tools are `dns_lookup`, `tcp_connect`, `http_check` and `tls_cert_expiry`.
+The kmcp controller creates the Deployment and Service. The container runs `python src/main.py --transport http --host 0.0.0.0 --port 3000`, allowing other pods to call `http://netprobe-mcp.kagent:3000/mcp`. kagent discovers the tools through that endpoint; step 10 assigns them to agents.
+
+Continue when the rollout succeeds and the `MCPServer` reports Ready. A Ready Deployment alone does not prove that MCP calls work; use the tool-discovery checks in [step 11](#11-open-local-access-and-check-tool-discovery) to confirm that all four probes are exposed.
 
 ![Two columns: the stdio fetch package behind an agentgateway adapter, and the custom HTTP netprobe-mcp image, both reconciled by kmcp and discovered by kagent](diagrams/04-kmcp-two-ways.jpg)
 
-*What steps 7 and 8 created. `fetch` is a public stdio package adapted by agentgateway on kmcp's default image; `netprobe-mcp` is the custom HTTP image built in step 8. Both become a Deployment and a Service that kagent discovers.*
+*Steps 7 and 8 create two tool servers: fetch uses agentgateway to bridge HTTP to stdio; netprobe serves HTTP directly from our ECR image. kmcp deploys both, and kagent calls their tools.*
 
 ## 9. Build the custom agent image
 
@@ -327,7 +397,7 @@ curl -fsS http://127.0.0.1:8083/api/toolservers | \
 
 The recorded result was five sources with 195 tools: built-in Kubernetes/Helm/etc. 124, Grafana 65, querydoc one, fetch one, netprobe four. The querydoc source is a labelled `Service`, not a `RemoteMCPServer`. The [source inventory](runtime-and-protocols.md#tool-sources-and-discovery) lists their in-cluster URLs and discovery rules.
 
-For manual API inspection, generate/import [the Postman collection](../postman/kagent.postman_collection.json) and set its environment ports to match the table:
+For manual API inspection, import [the existing Postman collection](../postman/kagent.postman_collection.json). Its collection variables already match these ports. Only regenerate it if you change the collection builder:
 
 ```bash
 python3 postman/build_collection.py
@@ -337,91 +407,117 @@ The collection has ten folders and 62 requests, covering APIs, direct MCP calls 
 
 ## 12. Test diagnosis, approval and orchestration
 
-Use new run IDs so a new demonstration keeps the committed evidence intact. Scripts save responses under `results/answers/<agent>/`.
+Use the **web UI** to ask questions, watch tool calls and make approval decisions. Use **Postman** to inspect requests and responses. Both invoke the deployed agents through the controller; scripts are optional for recording repeatable runs.
 
-### Start with a read-only diagnosis
+**UI walkthrough confirmed on 2026-10-13:** the operator reported that these examples worked. Supplied screenshots show diagnostic answers, metrics, delegated calls and interactive approval/question controls. See the [follow-up validation record](build-record.md#follow-up-web-ui-validation-2026-10-13).
+
+### Start in the web UI
+
+If these port-forwards from step 11 are not already running, start each in a separate terminal with the lab kubeconfig:
+
+```bash
+kubectl -n kagent port-forward svc/kagent-ui 8080:8080
+```
+
+```bash
+kubectl -n kagent port-forward svc/kagent-controller 8083:8083
+```
+
+Open **http://127.0.0.1:8080** for chat. Postman uses the controller API on port 8083.
+
+1. Open the Agents view and select `cluster-troubleshooter` in namespace `kagent`.
+2. Click **New Chat** and ask: **Why is the deployment api in namespace demo-broken not running?**
+3. Expand **Arguments** and **Results** on the tool-call cards to inspect the checks and evidence. Completed calls show a green check. For delegated agent cards, expand **Input**, **Output** and **Activity**.
+4. Read the final diagnosis. In the follow-up run it identified `ImagePullBackOff`, cited `nginx:1.99.99-does-not-exist` and explained that the invalid image tag prevents the pod from starting.
+
+Then select another agent and start a new chat. Try these questions one at a time:
+
+| Agent | Question | What to look for |
+|---|---|---|
+| `cluster-troubleshooter` | Why does the pod of deployment worker in namespace demo-broken keep restarting? Quote the log line. | The missing-config log line and exit status |
+| `observability-analyst` | How much CPU and memory is each node using right now, as a share of its capacity? | Current metrics rather than guessed usage |
+| `runbook-assistant` | The pod of deployment cache in demo-broken is OOMKilled. Diagnose it and tell me what the Kubernetes documentation says about memory limits and OOMKilled. | Workload evidence plus documentation |
+| `sre-orchestrator` | Is the cluster under CPU or memory pressure right now, and is anything in demo-broken restarting because of it? | Delegated specialist calls; container limits distinguished from node pressure |
+
+Copy more questions from [scripts/scenarios.txt](../scripts/scenarios.txt) into chat. Compare answers with step 7's known faults and the original [results](article.md#results); live metrics and timings will differ.
+
+### Make approval and rejection decisions in the UI
+
+Select `sre-operator` and ask: **Scale the deployment web in namespace demo-broken to 3 replicas.** This requests a real change to the lab.
+
+The UI displays an orange **Approval required** card for `k8s_scale` and an **Awaiting approval…** status. Expand **Arguments**, review the deployment name, namespace and replica count, then click **Approve**. After it completes, ask: **Scale the deployment web in namespace demo-broken down to 2 replicas.** Review this second proposal and click **Reject**.
+
+Run this check before and after each decision:
+
+```bash
+kubectl -n demo-broken get deploy web -o jsonpath='{.spec.replicas}{"\n"}'
+```
+
+From the original two-replica baseline, approval should produce `2 → 3`, and rejection should leave `3 → 3`.
+
+For delegated repair, select `sre-orchestrator` and ask: **Fix the Service checkout in namespace demo-broken so that it has endpoints. Tell me what you intend to change before you do it.**
+
+The flow has two separate decisions:
+
+1. In **Questions for you**, select the option to patch the Service selector to `app=web`, then click **Submit**. The option explains that `sre-operator` will request its own approval next. The wording can vary between runs.
+2. Review the operator's proposed `k8s_patch_resource` arguments in the separate **Approval required** card, then click **Approve** to execute the patch.
+
+Submitting the first answer chooses the repair approach; the second decision authorizes the tool call. Verify the result:
+
+```bash
+kubectl -n demo-broken get svc checkout -o jsonpath='{.spec.selector}{"\n"}'
+kubectl -n demo-broken get endpoints checkout
+```
+
+Expect selector `app: web` and endpoints for ready `web` pods. Restore the broken baseline, including `web`'s two replicas, before repeating the tests:
+
+```bash
+kubectl apply -f infra/demo/broken-workloads.yaml
+```
+
+### Try the same questions in Postman
+
+Keep the controller forward on 8083 running and import [the Postman collection](../postman/kagent.postman_collection.json). Agent questions need only this forward; the MCP forwards in step 11 are for direct tool calls.
+
+Set the collection variables (remove any conflicting environment overrides):
+
+| Variable | Value |
+|---|---|
+| `base_url` | `http://127.0.0.1:8083` |
+| `ns` | `kagent` |
+| `agent` | `cluster-troubleshooter`, or another agent from the table above |
+
+In **6 · Invoke an agent (A2A)**:
+
+1. Open **2 · message/send · ask the troubleshooter**. Edit `params.message.parts[0].text` and click **Send**. The controller forwards `{{base_url}}/api/a2a/{{ns}}/{{agent}}/` to your selected agent.
+2. Read `result.status.state` and `result.artifacts`; check for a JSON-RPC `error` too. The post-response script saves the task ID and context ID into `task_id` and `session_id`.
+3. Use **3 · message/send · follow-up in the same session** to continue. Use request 2 for a new conversation, including when switching agents.
+4. For live progress, edit and send **7 · message/stream · the orchestrator (long-running agents)**. This URL targets `sre-orchestrator` explicitly; the `agent` variable does not change it. Read its status and artifact events as they arrive.
+
+For approval, send **5 · sre-operator · a change that needs approval**. At `input-required`, review the pending call, then send **6 · sre-operator · approve the pending change** using the saved IDs. To reject, change its data part to `"decision_type": "reject"` and text to `"Rejected"`. Verify replicas afterward.
+
+Streaming request 7 does not save IDs automatically: copy the paused event's `result.taskId` into `task_id` and `result.contextId` into `session_id`. For delegated repair, use the UI or the [A2A continuation format](runtime-and-protocols.md#a2a-discovery-invocation-and-continuation). Folder **7 · Sessions and tasks** provides conversation history and task inspection.
+
+Selected equivalent requests were tested with curl; the collection itself was not run in Postman during the original build. See [validation scope](runtime-and-protocols.md#api-collection-and-validation-scope).
+
+### Optional: save repeatable runs with the scripts
+
+For a saved run through the controller:
 
 ```bash
 ./scripts/ask-agent.sh cluster-troubleshooter demo-s01 \
   "Why is the deployment api in namespace demo-broken not running?"
 ```
 
-Check that the answer cites the nonexistent image tag and the actual pull event. Repeat with the questions in [scripts/scenarios.txt](../scripts/scenarios.txt) if you want the full evaluation. The original [results](article.md#results) contain the timings, tool counts and verdicts; completion alone is not correctness.
+Use fresh IDs to preserve existing files under `results/answers/<agent>/`. Other helpers record [streaming events](../scripts/ask-agent-stream.sh), [automatically approve/reject](../scripts/approval-demo.sh), or [continue orchestrator tasks](../scripts/orchestrator-continue.sh). Detailed exchanges remain in the [approval](build-record.md#12-human-approval-over-a2a) and [orchestration](build-record.md#16-the-orchestrator-over-messagestream) records.
 
-`scripts/run-scenarios.sh` sends all fourteen initial questions through non-streaming controller requests, including the known long-running scenario 13, and writes the original `s01`–`s14` filenames. Inspect that script before using it for a new comparison. Streaming does not bypass the controller timeout.
+[run-scenarios.sh](../scripts/run-scenarios.sh) runs fourteen questions, including the unsuccessful scenario 13, and writes the original `s01`–`s14` filenames. Inspect it first to avoid overwriting recorded answers.
 
-### Check direct approval and rejection
+### If a request exceeds three minutes
 
-These commands request real changes to the lab's `web` deployment. The script supplies the approve/reject decision automatically to demonstrate the protocol.
+In kagent 0.9.10, the controller cuts both ordinary and streaming requests at 180 s, including UI and Postman requests. Run orchestrator questions one at a time; after a timeout, inspect logs and task state before retrying because work may continue in the pod.
 
-```bash
-kubectl -n demo-broken get deploy web -o jsonpath='{.spec.replicas}{"\n"}'
-./scripts/approval-demo.sh approve \
-  "Scale the deployment web in namespace demo-broken to 3 replicas." demo-approval
-kubectl -n demo-broken get deploy web -o jsonpath='{.spec.replicas}{"\n"}'
-./scripts/approval-demo.sh reject \
-  "Scale the deployment web in namespace demo-broken down to 2 replicas." demo-reject
-kubectl -n demo-broken get deploy web -o jsonpath='{.spec.replicas}{"\n"}'
-```
-
-For the original starting state, approval produced `2 → 3`; rejection left `3 → 3`. Inspect the saved pending call and task state as well as the replicas. For an interactive decision, use the UI or the collection's separate invocation and continuation requests.
-
-### Exercise delegated diagnosis and repair
-
-First ask the orchestrator to combine metrics and workload evidence:
-
-```bash
-./scripts/ask-agent-stream.sh sre-orchestrator demo-s14 \
-  "Is the cluster under CPU or memory pressure right now, and is anything in demo-broken restarting because of it?"
-```
-
-The original run completed in 78 s and distinguished a container memory limit from node memory pressure. CPU/memory shares will differ on another cluster or day.
-
-For the repair, use the UI or start a streamed task:
-
-```bash
-./scripts/ask-agent-stream.sh sre-orchestrator demo-s15 \
-  "Fix the Service checkout in namespace demo-broken so that it has endpoints. Tell me what you intend to change before you do it."
-```
-
-Inspect the recorded events and extract the latest paused task/context:
-
-```bash
-jq -rs '[.[].result | select(.kind=="status-update" and .status.state=="input-required")] \
-  | last | {taskId,contextId,message:.status.message}' \
-  results/answers/sre-orchestrator/demo-s15.events.jsonl
-```
-
-Use those identifiers to answer the backend question. Replace the ID placeholders below and use the actual choice text returned by the question:
-
-```bash
-./scripts/orchestrator-continue.sh demo-s15 '<contextId>' '<taskId>' answer \
-  'Yes, patch the selector to app=web'
-```
-
-Inspect the next `input-required` event. It should name the operator's proposed `k8s_patch_resource` call. Review the arguments, then send the execution decision using the latest task/context identifiers:
-
-```bash
-./scripts/orchestrator-continue.sh demo-s15 '<contextId>' '<taskId>' approve
-kubectl -n demo-broken get svc checkout -o jsonpath='{.spec.selector}{"\n"}'
-kubectl -n demo-broken get endpoints checkout
-```
-
-The original outcome was selector `{app: web}` and three endpoints after the earlier scale to three replicas. The first pause resolves intent; the second gates execution. Repairing the Service changes the original fault, so reapply the demo manifest before another baseline diagnosis run. It also resets `web` to the manifest's two replicas.
-
-The continuation helper implements answering a question and approving a call; for rejecting a delegated call, use the UI or the A2A continuation format in the [reference](runtime-and-protocols.md#a2a-discovery-invocation-and-continuation).
-
-### Long-running requests
-
-In kagent 0.9.10, both controller `message/send` and `message/stream` paths are cut at 180 s. Some abandoned work continued in the pod; immediate retries overlapped and contributed to an OOMKill. Run orchestrator tests one at a time and inspect the previous execution before retrying.
-
-A direct port-forward to the agent bypasses the controller's timeout:
-
-```bash
-kubectl -n kagent port-forward svc/sre-orchestrator 8090:8080
-```
-
-Send an A2A JSON-RPC body directly to `http://127.0.0.1:8090/` with the collection or curl. The existing `ask-agent-stream.sh` constructs a controller path; changing `KAGENT` alone does not turn it into a direct-Service client. The direct scenario 13 attempt was stopped on cost and never completed; bypassing this timeout is not evidence that the full request succeeds.
+The [timeout reference](runtime-and-protocols.md#http-timeouts-and-request-lifetime) covers direct agent access. Scenario 13 never completed through any tested path; start with the smaller questions above.
 
 ## Troubleshooting
 

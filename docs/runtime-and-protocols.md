@@ -220,6 +220,8 @@ Three overlapping requests were present when the orchestrator was OOMKilled at i
 
 Routes and bodies were taken from kagent v0.9.10's `go/core/internal/httpserver/server.go` and handlers. System, tool-source, direct MCP, agent-list, session-list and controller-MCP requests were exercised with curl. Their responses are in [results/raw/api/](../results/raw/api/). The collection itself was not executed in Postman, and every CRUD request was not tested.
 
+On 2026-10-13, the operator reported successfully completing the setup guide's web UI walkthrough. Screenshots show completed diagnostic and delegated calls, final answers, the operator's **Approve/Reject** controls, and the orchestrator's **Questions for you** form. This adds manual UI validation; it does not establish execution of the Postman collection. See the [follow-up record](build-record.md#follow-up-web-ui-validation-2026-10-13).
+
 Agent invocation uses A2A or the controller MCP `invoke_agent` tool. Direct operational tool calls go to the owning MCP server; the controller does not provide a separate REST route for executing them. The collection also contains a v1 wire-format example; the observed custom-agent exchanges use A2A 0.3.
 
 ## Version and deployment boundaries

@@ -2007,10 +2007,10 @@
                 "sre-orchestrator"
               ]
             },
-            "description": "`message/send` through the controller times out after 3 minutes (the a2a-go client's default), and the orchestrator, which calls other agents in turn, takes longer. `message/stream` returns server-sent events as the agent works: status updates (each delegated call appears as a function-call data part named kagent__NS__<agent>), artifact updates with the answer, and a final status. Postman shows the stream as it arrives.",
+            "description": "This request explicitly targets sre-orchestrator, regardless of the `agent` variable. The default question is scenario 14, which completed in the recorded build. `message/stream` returns server-sent events as the agent works: status updates (delegated calls appear as function-call data parts), artifact updates with the answer, and a final status. In kagent 0.9.10 the controller cuts both `message/send` and `message/stream` at 180 seconds; streaming exposes progress but does not bypass that timeout. This request does not automatically save task/session IDs: for continuation, copy the latest result.taskId and result.contextId from the events into `task_id` and `session_id`.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"1\",\n  \"method\": \"message/stream\",\n  \"params\": {\n    \"message\": {\n      \"role\": \"user\",\n      \"kind\": \"message\",\n      \"messageId\": \"{{$guid}}\",\n      \"parts\": [\n        {\n          \"kind\": \"text\",\n          \"text\": \"Something is wrong in namespace demo-broken. Find every problem and give me the fix for each. Do not change anything.\"\n        }\n      ]\n    }\n  }\n}",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"1\",\n  \"method\": \"message/stream\",\n  \"params\": {\n    \"message\": {\n      \"role\": \"user\",\n      \"kind\": \"message\",\n      \"messageId\": \"{{$guid}}\",\n      \"parts\": [\n        {\n          \"kind\": \"text\",\n          \"text\": \"Is the cluster under CPU or memory pressure right now, and is anything in demo-broken restarting because of it?\"\n        }\n      ]\n    }\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"

@@ -210,6 +210,8 @@ One instructive deployment issue was Grafana MCP tool discovery. Initializing th
 
 **Scope.** Specialist questions were run once. The orchestrator questions were retried through streaming and, for scenario 13, directly against its Service. No model was swapped on the same question, and timings were recorded in whole seconds. Per-scenario model cost was not captured.
 
+**Subsequent UI walkthrough (2026-10-13).** The operator reported that the [setup guide's interactive examples](setup-guide.md#12-test-diagnosis-approval-and-orchestration) worked through the web UI. Supplied screenshots show diagnostic answers, node metrics, specialist delegation and approval/question prompts. The [follow-up record](build-record.md#follow-up-web-ui-validation-2026-10-13) documents this validation; the timings and verdicts below remain those measured on 2026-10-07.
+
 ## Results
 
 Measured on 2026-10-07 on the cluster described above. Specialist timings are wall-clock seconds for a single request. Orchestrator outcomes include the documented retries. Tool calls come from A2A task history or the custom reporter's progress messages. Full answers and raw responses are in [results/answers/](../results/answers/).

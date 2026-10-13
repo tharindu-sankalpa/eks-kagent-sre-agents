@@ -16,7 +16,7 @@ Six of the seven agents are YAML configurations: a model reference, system instr
 | Follow the original commands, outputs and investigations | [Build record](docs/build-record.md) |
 | Review the short public post | [LinkedIn draft](docs/linkedin-post.md) |
 
-The experiment ran on 2026-10-07. Its cluster was subsequently deleted; the recorded responses and screenshots document that run. The reordered setup procedure is reconstructed from the final manifests and has not been rerun on a fresh cluster.
+The original experiment ran on 2026-10-07 and its cluster was subsequently deleted. The setup guide was reconstructed from the final manifests. On 2026-10-13, the operator reported successfully following its web UI walkthrough, with screenshots of diagnosis, metrics, delegation and approval prompts. See the [follow-up validation record](docs/build-record.md#follow-up-web-ui-validation-2026-10-13); the benchmark results below remain measurements from the original run.
 
 ![System overview: SRE, kagent controller, sre-orchestrator, six specialist agents, five MCP tool servers, demo-broken and monitoring targets, platform strip](docs/diagrams/01-system-overview.jpg)
 
