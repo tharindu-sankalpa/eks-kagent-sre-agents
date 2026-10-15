@@ -150,6 +150,12 @@ Success criterion: `gp3 (default)` uses `ebs.csi.aws.com`, with `Delete` reclaim
 
 ## 3. Create the model Secret
 
+For this project, a dedicated OpenRouter API key named `eks-kagent-sre-agents` was created in the OpenRouter portal with a **24-hour expiry** and a **$5 total credit limit**, with no automatic limit reset. OpenRouter enforces these limits; the Kubernetes Secret stores the key. Set its value as `OPENROUTER_API_KEY` in your gitignored `.env` and reload it using step 0 before continuing.
+
+<img src="screenshots/openrouter-api-key-limits.png" alt="OpenRouter API key settings showing a 1-day expiry, $5 credit limit and no automatic reset" width="500">
+
+*OpenRouter key settings for this project: expiry after one day and a $5 total limit.*
+
 Every declarative model configuration references the same Secret. The custom agent receives its key from that Secret too. Create it before applying the agents.
 
 ```bash
