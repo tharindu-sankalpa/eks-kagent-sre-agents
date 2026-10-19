@@ -1,1 +1,4 @@
-{"error":false,"message":"Successfully listed agents"}
+{
+    "error": false,
+    "message": "Successfully listed agents"
+}

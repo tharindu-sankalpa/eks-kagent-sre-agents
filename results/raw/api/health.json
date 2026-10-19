@@ -1,1 +1,7 @@
-{"error":false,"data":{"status":"OK"},"message":"OK"}
+{
+    "error": false,
+    "data": {
+        "status": "OK"
+    },
+    "message": "OK"
+}

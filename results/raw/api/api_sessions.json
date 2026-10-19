@@ -1,1 +1,4 @@
-{"error":false,"message":"Successfully listed sessions"}
+{
+    "error": false,
+    "message": "Successfully listed sessions"
+}

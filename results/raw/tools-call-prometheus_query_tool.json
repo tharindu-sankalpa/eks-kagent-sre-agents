@@ -1,1 +1,13 @@
-{"jsonrpc":"2.0","id":9,"result":{"content":[{"type":"text","text":"Invalid PromQL query: validation error in field 'query': potentially dangerous characters in query"}],"isError":true}}
+{
+    "jsonrpc": "2.0",
+    "id": 9,
+    "result": {
+        "content": [
+            {
+                "type": "text",
+                "text": "Invalid PromQL query: validation error in field 'query': potentially dangerous characters in query"
+            }
+        ],
+        "isError": true
+    }
+}

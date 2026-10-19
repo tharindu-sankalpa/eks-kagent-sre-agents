@@ -1,1 +1,31 @@
-{"error":false,"data":[{"ref":"kagent/default-model-config","spec":{"model":"deepseek/deepseek-v4.1-flash","apiKeySecret":"kagent-openrouter","apiKeySecretKey":"OPENROUTER_API_KEY","provider":"OpenAI","openAI":{"baseUrl":"https://openrouter.ai/api/v1"}},"status":{"conditions":[{"type":"Accepted","status":"False","lastTransitionTime":"2026-10-07T06:10:37Z","reason":"ModelConfigReconcileFailed","message":"1 error occurred:\n\t* failed to get secret kagent-openrouter: Secret \"kagent-openrouter\" not found\n\n"}],"observedGeneration":1,"secretHash":"<sha256 of the Secret, redacted>"}}],"message":"Successfully listed ModelConfigs"}
+{
+    "error": false,
+    "data": [
+        {
+            "ref": "kagent/default-model-config",
+            "spec": {
+                "model": "deepseek/deepseek-v4.1-flash",
+                "apiKeySecret": "kagent-openrouter",
+                "apiKeySecretKey": "OPENROUTER_API_KEY",
+                "provider": "OpenAI",
+                "openAI": {
+                    "baseUrl": "https://openrouter.ai/api/v1"
+                }
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "type": "Accepted",
+                        "status": "False",
+                        "lastTransitionTime": "2026-10-07T06:10:37Z",
+                        "reason": "ModelConfigReconcileFailed",
+                        "message": "1 error occurred:\n\t* failed to get secret kagent-openrouter: Secret \"kagent-openrouter\" not found\n\n"
+                    }
+                ],
+                "observedGeneration": 1,
+                "secretHash": "<sha256 of the Secret, redacted>"
+            }
+        }
+    ],
+    "message": "Successfully listed ModelConfigs"
+}

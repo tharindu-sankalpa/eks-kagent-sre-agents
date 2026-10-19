@@ -1,1 +1,21 @@
-{"jsonrpc":"2.0","id":5,"result":{"content":[{"type":"text","text":"{\"ok\":true,\"status_code\":200,\"latency_ms\":68.6,\"final_url\":\"http://kagent-ui.kagent.svc.cluster.local:8080/\",\"server\":\"nginx/1.31.2\",\"content_length\":15921}"}],"structuredContent":{"ok":true,"status_code":200,"latency_ms":68.6,"final_url":"http://kagent-ui.kagent.svc.cluster.local:8080/","server":"nginx/1.31.2","content_length":15921},"isError":false}}
+{
+    "jsonrpc": "2.0",
+    "id": 5,
+    "result": {
+        "content": [
+            {
+                "type": "text",
+                "text": "{\"ok\":true,\"status_code\":200,\"latency_ms\":68.6,\"final_url\":\"http://kagent-ui.kagent.svc.cluster.local:8080/\",\"server\":\"nginx/1.31.2\",\"content_length\":15921}"
+            }
+        ],
+        "structuredContent": {
+            "ok": true,
+            "status_code": 200,
+            "latency_ms": 68.6,
+            "final_url": "http://kagent-ui.kagent.svc.cluster.local:8080/",
+            "server": "nginx/1.31.2",
+            "content_length": 15921
+        },
+        "isError": false
+    }
+}

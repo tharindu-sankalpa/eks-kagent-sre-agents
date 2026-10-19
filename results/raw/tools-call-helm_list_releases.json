@@ -1,1 +1,12 @@
-{"jsonrpc":"2.0","id":9,"result":{"content":[{"type":"text","text":"NAME       \tNAMESPACE \tREVISION\tUPDATED                               \tSTATUS  \tCHART                       \tAPP VERSION\nkagent     \tkagent    \t1       \t2026-10-07 11:39:56.770974 +0530 +0530\tdeployed\tkagent-0.9.10               \t           \nkagent-crds\tkagent    \t1       \t2026-10-07 11:39:41.025187 +0530 +0530\tdeployed\tkagent-crds-0.9.10          \t           \nprometheus \tmonitoring\t1       \t2026-10-07 11:43:56.813669 +0530 +0530\tdeployed\tkube-prometheus-stack-83.6.0\tv0.90.1    \n"}]}}
+{
+    "jsonrpc": "2.0",
+    "id": 9,
+    "result": {
+        "content": [
+            {
+                "type": "text",
+                "text": "NAME       \tNAMESPACE \tREVISION\tUPDATED                               \tSTATUS  \tCHART                       \tAPP VERSION\nkagent     \tkagent    \t1       \t2026-10-07 11:39:56.770974 +0530 +0530\tdeployed\tkagent-0.9.10               \t           \nkagent-crds\tkagent    \t1       \t2026-10-07 11:39:41.025187 +0530 +0530\tdeployed\tkagent-crds-0.9.10          \t           \nprometheus \tmonitoring\t1       \t2026-10-07 11:43:56.813669 +0530 +0530\tdeployed\tkube-prometheus-stack-83.6.0\tv0.90.1    \n"
+            }
+        ]
+    }
+}
