@@ -1,482 +1,376 @@
-# LinkedIn carousel: brief and page content
+# LinkedIn carousel: a five-to-ten-minute project summary
 
-A document post on LinkedIn is a PDF that the feed renders as a swipeable carousel. This file is the complete brief for that PDF: how to produce it, the style, and the exact text, excerpts and numbers of every page. Every fact below comes from the README, the manifests and the recorded results; nothing in the pages should be changed or added by the design tool.
+This is the production brief for a **12-page PDF** summarizing the multi-agent system for SRE workflows. It should stand on its own: a reader should understand what was built, what kagent and kmcp supplied, what the custom MCP server and agent add, how a repair involved the user, and what the tests actually established.
 
-The PDF is the first of three layers. It is a presentation-style tour of the whole project that takes five to ten minutes without reading anything else. The [article](article.md) is the second layer, with the reasoning, the method and the full results. The repository is the third: setup guide, build record, runtime reference, manifests, code and raw responses. The last page says so.
+The PDF is the first layer. The [article](article.md) supplies the explanation and full results; the repository supplies the implementation, setup guide, component READMEs, Postman collection and recorded responses. The PDF gives readers enough understanding to choose where to go next.
 
 Repository: https://github.com/tharindu-sankalpa/eks-kagent-sre-agents
 
-## How to produce it
+## Editorial decisions
 
-Give the design tool this file and, if it can read the repository, the repository itself. Then:
+- **Twelve pages, with a five-minute reading path.** The title and takeaway on every page should tell the story in about five minutes. Reading the evidence and excerpts should take closer to ten. These are design targets, not measured reading times.
+- **Show the system, then a real repair.** Page 2 uses the existing main architecture diagram. Page 3 explains the two different human decisions and the verified outcome before introducing resource fields.
+- **Give the custom work space.** netprobe and the incident reporter each get a page. Separate the framework's deployment/runtime features from the probe functions, custom loop and validation work written here.
+- **Keep implementation examples selective.** One short declarative excerpt and two small BYO deployment excerpts are enough. Model-provider configuration, prompt-template variants and the three tool-source resource kinds belong in the article/reference.
+- **Include interaction, not only automation.** Show the web UI, local MCP discovery/calls and invoking the deployed agent. The scripts are an optional repeatable test path.
+- **Use evidence with a purpose.** One readable repair screenshot is more useful than several small UI inventory screenshots. Full schemas, tool catalogues and responses are linked from the component READMEs.
+- **Bound claims to the recorded run.** The main results describe EKS on 2026-10-07. Later local or AKS captures are not substitutes for those measurements. Human input and approval are distinct; task completion and answer accuracy are distinct.
 
-1. Check every page against this file: numbers, names, YAML lines, arrow directions. The tool must not add facts.
-2. Export as PDF, 16 pages, A4 portrait (210 × 297 mm; 2480 × 3508 px at 300 dpi, or vector), no margins beyond the page's own padding. A4 is a deliberate choice so the same file works as a document outside LinkedIn; LinkedIn fits each page to the feed width.
-3. Name the file `multi-agent-sre-on-eks.pdf`. LinkedIn shows the file name as the document title in the feed.
-4. Post it with the text from [linkedin-post.md](linkedin-post.md). Links inside the PDF are not clickable on LinkedIn, so the article and repo URLs go in the post text, and pages 1 and 16 write the repo URL out plainly.
+## Review of the supplied PDF
 
-## What the first version got wrong
+`Eight-page carousel design-v2.pdf` contains **16 A4 portrait pages**, despite its filename. The following refers to that export's page numbers; the replacement sequence below has 12 pages.
 
-A first version was generated from an earlier eight-page brief. Keep these fixes:
+| Observation in the supplied export | Change for the next version |
+|---|---|
+| The cover still says “multi-agent orchestration” and has four explanatory points competing with the headline. | Use “multi-agent system,” a short purpose statement and one bounded result. |
+| Page 2 redraws a simplified system and omits the OpenRouter and platform context present in the main diagram. | Embed `docs/diagrams/01-system-overview.jpg` directly. Explain the main path in three short takeaways. |
+| Configuration occupies much of pages 4–10; the custom reporter's implementation has no dedicated page. | Consolidate configuration and add dedicated MCP-server and BYO-agent pages. |
+| Page 3's ECR screenshot extends below the page; its second caption and footnote are absent. `ap-south-1` also wraps mid-name in the first caption. | Remove the dedicated console-gallery page. Keep environment facts in the architecture caption; retain the screenshots in the article/build record. |
+| Page 8 reaches the lower edge; the stdio-package explanation and reserved footer space are lost. | Use shorter excerpts and a fixed footer exclusion area. Treat overflow as an error. |
+| Page 5's narrow columns wrap code, image names and endpoints into awkward fragments. Other code cards also carry long lines. | Stack short full-width code cards. Use selected fields, not two miniature manifests side by side. |
+| Results arrive only on page 14, and the repair is first explained on page 12. | Put a result on the cover and the repair on page 3; keep the complete outcome breakdown near the end. |
+| The last page includes the literal `<ARTICLE_URL>` placeholder. | Insert the published URL when available; otherwise use the repository's article path. No unresolved placeholder in the export. |
 
-- Page 2 drew the six specialists as two columns with double-headed arrows between each pair, which reads as specialists calling each other. Each specialist gets its own branch from the spine, with one arrowhead on the card and none between cards.
-- Page 2's caption broke "ap-south-1" across two lines. The caption is now two fixed lines.
-- Page 3's footnote ran off the page under a 23-line excerpt. Excerpts now start at `spec:` and no page carries more than 16 lines of code.
-- The cover did not say what the system is for or what it is built with. It now does, with the repository URL.
-- The cover said nothing about where the tools come from. It now has a fourth point on the tool servers, and a cover illustration.
-- There was no page on how the work was tested and no page on where to read more by the time available. Pages 13 and 16 add them.
-- The diagram boxes and arrows were hairlines. Cards now have 3 px outlines and arrows are 3 px with solid heads.
-- "Six agents are YAML. One is a container." blurred the two agent types kagent has. The cover now names them, page 2 marks which agent is which, and a new page 5 explains Declarative versus BYO from the resource definition.
-- There was no evidence from the live system. Six screenshot crops are now placed on pages 3, 6, 8, 10 and 12. The two from the AWS console come first, on page 3, so the platform is visible before the YAML.
+Keep the consistent typography, restrained palette, clear stat tiles and separation of findings from limitations. The main changes are the content hierarchy, ownership of the custom work and the overflow fixes.
 
----
+## Production and visual rules
 
-## Brief for the design tool
+- Export **12 pages, A4 portrait (210 × 297 mm)**. Use `multi-agent-sre-on-eks-summary.pdf`. Do not edit or overwrite the supplied PDF as part of this brief update.
+- Keep at least 14 mm page padding and reserve the bottom 16 mm for page number/source text. Content never enters that footer area.
+- Use Inter or a similar sans-serif. Suggested A4 sizes: headline 28–34 pt, body 16–18 pt, captions 12–14 pt, code 12–14 pt. The cover may have a three-line headline; other pages should have at most two. Font sizes are starting points: check the exported document at phone width as well as at 100% on desktop.
+- Aim for roughly 60–110 words of visible prose per page, excluding the architecture image, code and source labels. Page 10's results table is the intentional exception. Cut content before reducing type size.
+- Canvas `#FAFAFA`; dark text `#0F172A`; secondary text `#475569`. Use indigo `#4F46E5` for requests/orchestration, blue `#2563EB` for diagnosis, amber `#B45309` for execution approval, cyan `#0E7490` for BYO components. Keep fills pale.
+- Every page has a short kicker, a headline, one main visual or content group, one takeaway and `n/12`. Sources can be a short repository path; no long file path squeezed into a headline.
+- **Reuse supplied diagrams without regenerating or reconstructing them.** Preserve their aspect ratios and labels. On page 2 the architecture is the main visual; avoid a competing illustration, lengthy legend or code block.
+- The main diagram is detailed. Fit it to the full available width without cutting off its legend, OpenRouter box or platform strip. The three takeaways beneath it must remain readable without zooming. If small diagram labels cannot be read, direct readers to the full-resolution asset in the repository; do not pretend they are legible or stretch the image vertically.
+- Screenshots support a specific observation, not general claims that “everything works.” Use the supplied repair crop on page 3. Do not add every available screenshot or diagram. The detailed netprobe contracts diagram remains in the article and MCP README; shrinking it onto a summary page would hide its useful detail.
+- Use full-width code cards, a monospace face, no line numbers and no more than 12 lines per card. Page 8 has two stacked cards of 7 and 5 lines. Label every excerpt as selected fields, not an apply-ready manifest. Do not wrap an identifier, hostname or image tag in the middle; shorten the excerpt instead.
+- No decorative cover graph, invented logos, stock imagery or generic AI art. Preserve the exact source text and numbers below. A designer may change line breaks and spacing, but must report any substantive edit or overflow.
+- Keep links clickable in the exported PDF where supported, and print the repository address as readable text. Put the destination links in the accompanying post too. Do not make platform-dependent link behavior the only way to find the work.
 
-Design a 16-page document for a LinkedIn document post (PDF carousel) that also works as a stand-alone A4 document. Pages are A4 portrait, 210 × 297 mm. It is read inside the LinkedIn feed at phone width, so everything is large relative to the page: body text at least 1/36 of the page width, captions and code at least 1/45 of the page width (on a 2480 px wide page: 68 px and 55 px). Each page is one slide of a presentation: one idea, read in twenty to thirty seconds. No page has more than one diagram, and no page has more than one code card unless this brief shows two (pages 5 and 7). Use only the text given below; do not add, reword, shorten or invent any sentence, number, file name or YAML line. Do not add stock imagery or photographs, and no illustration other than the cover illustration described under Style. If a page does not fit, do not shrink the type below the minimums; report which page overflowed.
+## Page 1 · the build and the result
 
-### Style
+**Kicker:** `MULTI-AGENT SYSTEM · SRE WORKFLOWS`
 
-- Canvas #FAFAFA. Text #0F172A, secondary text #475569. A thin rule in #4F46E5 across the top of every page.
-- Each page has three fixed elements: a small-caps kicker in indigo #4F46E5 at the top left (letter-spaced, about 1/50 of the page width), a bold headline below it (about 1/18 of the page width, two lines at most), and a page number "n/16" bottom right in secondary text.
-- Typeface: one clean sans-serif such as Inter for everything except code; a monospace such as JetBrains Mono for code. Consistent sizes across pages.
-- Accent colours, used only for small marks, left accent bars, arrows and one highlighted phrase per headline: indigo #4F46E5 (orchestration, requests), blue #2563EB (diagnosis), amber #B45309 (changes that need approval), cyan #0E7490 (the custom agent), steel-blue #0369A1 (results and tool calls, dashed). Fills on cards are very pale tints of the same colours; never a saturated block.
-- Diagram cards: white fill, a solid 3 px outline in dark slate #334155, 12 px radius, a 6 px coloured left accent bar, and the name in bold. Cards must read as solid boxes, not hairline frames. Arrows are 3 px, with a filled triangular head about 14 px long at the destination only: solid indigo for requests and delegation, dashed steel-blue for results. No double-headed arrows anywhere.
-- Screenshots: the crops in `docs/screenshots/crops/` are placed as-is, full column width, inside a card with the same 3 px slate outline and 12 px radius, never re-cropped, recoloured or annotated. The console crops are cut so that the AWS header, the service breadcrumb and the left navigation stay visible: the page must read as the AWS console, and the kagent crops keep the kagent navigation bar for the same reason. Screenshot text may be smaller than body text; the caption beneath each one carries the facts.
-- Code cards: a dark card #1E293B with light text, a header line in the card naming the file, no line numbers, and the lines named under each excerpt highlighted with a faint amber band. Keep the YAML indentation exactly as given. Comments after `#` are part of the excerpt.
-- A small person-and-check mark means "a human approves before this runs"; it appears only where the text says so.
-- Cover illustration: page 1 carries one illustration in the top two fifths of the page, drawn as vector shapes in the palette above: a large indigo disc with six smaller discs below it in the six agent colours (the fifth dashed cyan), joined by a spine with six branches, two of the discs carrying the person-and-check mark, over a faint dot grid, with soft pale tinted halos behind the discs for depth. No text inside the illustration. No photographs, stock imagery, robots, brains, circuit traces or glowing networks. It is the only illustration in the document.
-- Technology marks: the cover carries three badges for Amazon EKS, kagent and kmcp. Use each project's official mark unaltered, at the same height, on a white badge with the name beside it. If a mark is not available, use a text badge with the name only. No other logos anywhere.
-- Plenty of empty space.
+**Headline:** `A multi-agent system for SRE workflows`
 
-### Page 1 · cover
+**Subtitle:** `Amazon EKS · kagent · kmcp`
 
-Kicker: `MULTI-AGENT SYSTEM · SRE WORKFLOWS ON AMAZON EKS`
+**Visible copy:**
 
-Headline: `A multi-agent system for SRE workflows on Amazon EKS with kagent and kmcp` (highlight "kagent and kmcp" in indigo)
+> Seven agents diagnose Kubernetes faults and coordinate repairs. The workflow can pause for missing information and separately for execution approval.
+>
+> In the recorded repair: two human decisions, one Service patch, three verified endpoints.
 
-Standfirst, one paragraph in secondary text, about 34 px: `An orchestrator uses six specialist agents as tools to diagnose Kubernetes faults and coordinate repairs. A human approves every change, including changes requested by another agent.`
+**Main visual:** Three clean stat cards: `7 agents` / `4 custom probes` / `2 human decisions in the repair`. No architecture illustration on the cover; the actual architecture follows on page 2.
 
-Three numbered lines, large numerals in indigo:
+**Takeaway:** `A working repair, diagnostic results and documented failures—not a production reliability claim.`
 
-1. **Six agents are declarative, one is bring-your-own.** Declarative: YAML that kagent's runtime executes. BYO: a container that speaks A2A.
-2. **The orchestrator's tools are the other agents.** It has no Kubernetes tools of its own.
-3. **Every change pauses for a human.** The gate held even when one agent called another.
-4. **Tools come from MCP servers, not from agent code.** kagent's built-in server with 124 Kubernetes, Helm and Prometheus tools; servers deployed by kmcp; and one written here, four network probes in Python, containerised and deployed the same way.
+**Footer:** `A five-to-ten-minute summary · Recorded EKS tests: 2026-10-07`
 
-A row of three technology badges: `Amazon EKS 1.34`, `kagent 0.9.10`, `kmcp 0.3.0`.
+Print the repository address on a separate readable line: `github.com/tharindu-sankalpa/eks-kagent-sre-agents`.
 
-Repository line, monospace, about 28 px: `github.com/tharindu-sankalpa/eks-kagent-sre-agents`
+## Page 2 · the actual architecture
 
-Footer line in indigo italic: `A ten-minute tour. The article has the reasoning; the repository has everything. Swipe →`
+**Kicker:** `THE SYSTEM`
 
-### Page 2 · the system
+**Headline:** `How the pieces fit`
 
-Kicker: `THE SYSTEM`
+**Main visual:** Use **`docs/diagrams/01-system-overview.jpg`**, the same main architecture diagram used in the article and repository README. Place it full-width at its native aspect ratio. Do not draw a replacement specialist graph.
 
-Headline: `One request, six specialists, five tool servers` (highlight "six specialists" in indigo)
+**Three takeaways beneath it:**
 
-Diagram, top to bottom, centred:
+1. **A2A connects agents.** The orchestrator delegates to six specialists; it has no direct Kubernetes tools.
+2. **MCP connects tools.** Each specialist sees a selected subset of the operational and custom tools.
+3. **Two deployment layers.** kagent runs agents; kmcp runs the additional MCP servers. Models are reached through OpenRouter.
 
-- Row 1: a person mark labelled `SRE`, a solid indigo arrow labelled `A2A` to a card `kagent controller`, a solid indigo arrow down to a wide indigo-accent card `sre-orchestrator` with caption `Its tools are six agents`.
-- Row 2: one indigo line leaves the bottom of the orchestrator to a horizontal spine labelled `A2A delegation · agents as tools`. From the spine, six separate branches go down, each ending with one arrowhead on the top of its own card. Six small cards in two rows of three, in this order: `cluster-troubleshooter` (blue), `observability-analyst` (teal #0F766E), `runbook-assistant` (violet #7C3AED); `release-manager` (amber, person-and-check mark), `incident-reporter` (cyan, dashed outline), `sre-operator` (amber, person-and-check mark). No arrow joins two specialist cards.
-- Row 3: one dashed steel-blue arrow from below the six cards to one wide amber-accent card `5 MCP tool servers`, caption `kagent-tools · grafana-mcp · netprobe-mcp · fetch · querydoc`.
-- Row 4: one dashed steel-blue arrow to a plain card `Kubernetes API · Prometheus · Grafana`.
+**Environment caption, two fixed lines:**
 
-Under the six cards, inside the specialist group, one line in secondary text: `Solid cards: declarative agents on kagent's runtime. Dashed card: bring-your-own container. The orchestrator is declarative too.`
-
-Caption under the diagram, secondary text, exactly two lines:
 `Amazon EKS 1.34 · 2 × t3.xlarge · ap-south-1`
-`kagent 0.9.10 · kmcp 0.3.0 · models via OpenRouter`
 
-### Page 3 · on the cluster
+`kagent 0.9.10 · kmcp 0.3.0 · 2026-10-07 test environment`
 
-Kicker: `THE CLUSTER · ON AWS`
+Keep `ap-south-1` unbroken. All seven agents, five tool servers and the external model endpoint belong to this map; a single request need not invoke every specialist or tool server.
 
-Headline: `What it looked like on AWS` (highlight "on AWS" in amber)
+## Page 3 · one repair, two different human decisions
 
-Two screenshot cards stacked, full width, each with its caption:
+**Kicker:** `THE REPAIR · SCENARIO 15`
 
-1. `docs/screenshots/crops/aws-eks-console-nodes.png`. Caption: `Amazon EKS console, cluster kagent-sre-lab: two t3.xlarge on-demand nodes in ap-south-1, no node health issues, three minutes after creation.`
-2. `docs/screenshots/crops/aws-ecr-console-repos.png`. Caption: `Amazon ECR: the two images built here, incident-reporter-agent and netprobe-mcp, pushed to private repositories in the same region.`
+**Headline:** `First clarify intent. Then approve execution.`
 
-Footnote, secondary text: `Captured on 2026-10-07. The cluster was deleted after the run; the repository keeps every raw response.`
+**User request:** `Fix checkout so it has endpoints. Tell me what you intend to change first.` Label this as the shortened request.
 
-### Page 4 · an agent is a YAML file
+**Main visual:** A five-step vertical sequence with two distinct pale-yellow pause bands:
 
-Kicker: `STEP 1 · DEFINE AN AGENT`
+1. The troubleshooter finds `checkout` selects `app: checkout`; the ready pods have `app: web`.
+2. **User input:** the orchestrator asks which backend is intended.
+3. The user's answer selects the repair; the orchestrator delegates to the operator.
+4. **Execution approval:** the runtime pauses the operator's exact `k8s_patch_resource` call.
+5. The approved patch changes the selector. `kubectl` confirms **three endpoints**.
 
-Headline: `An agent is a YAML file` (highlight "YAML file" in indigo)
+**Evidence:** `docs/screenshots/crops/s15-orchestrator-ask-user.png`, placed below the sequence only if the question remains readable. Caption: `A separate UI run shows the backend-selection question. The original API transcripts and kubectl checks establish the recorded repair outcome.` If the crop is too small, omit it and retain the source path; do not shrink the five-step explanation.
 
-Code card, header `infra/kagent/agents/sre-operator.yaml · shortened`:
+**Takeaway:** `Choosing the repair and approving its execution are separate decisions.`
+
+**Measured note:** `62 s across three exchanges: 32 + 16 + 14 s. Human deliberation time excluded.`
+
+**Source:** `docs/build-record.md, section 16; results/answers/sre-orchestrator/s15.*`.
+
+## Page 4 · supplied platform and custom work
+
+**Kicker:** `WHAT WAS BUILT`
+
+**Headline:** `Framework capabilities, custom implementation`
+
+**Main visual:** Two readable stacked groups, not narrow text columns.
+
+**kagent and kmcp supplied:**
+
+- Agent deployment, the declarative ADK-based runtime, A2A integration and approval support.
+- Bundled operational MCP tools for Kubernetes, Helm, Prometheus, Grafana and other systems.
+- MCP server deployment from an existing package or a custom image.
+
+**This project added:**
+
+- Six declarative agent definitions, including the orchestrator, with selected tools and instructions.
+- Four FastMCP network probes and a BYO incident reporter with its own Python loop.
+- Container builds pushed to ECR, a broken-workload lab, manual/API walkthroughs and recorded checks.
+
+**Takeaway:** `The deployment platform is reusable; the roles, custom code and evidence define this project.`
+
+**Scope line:** `Six declarative agents + one BYO agent. Both are kagent Agent resources.`
+
+## Page 5 · the declarative agent contract
+
+**Kicker:** `DECLARATIVE AGENTS`
+
+**Headline:** `Configure the model, instructions and tools`
+
+**Code card:** `sre-operator.yaml · selected fields, not a complete manifest`
 
 ```yaml
 spec:
   type: Declarative
   declarative:
     modelConfig: grok-4-7
-    systemMessage: |
-      Diagnose before you act.
-      Make the smallest change that fixes the problem.
-      Every change goes through an approval prompt.
+    systemMessage: "Diagnose before proposing a change."
     tools:
       - type: McpServer
         mcpServer:
           kind: RemoteMCPServer
           name: kagent-tool-server
-          toolNames: [k8s_get_resources, k8s_scale, k8s_patch_resource]
-          requireApproval: [k8s_scale, k8s_patch_resource]
+          toolNames: [k8s_scale]
+          requireApproval: [k8s_scale]
 ```
 
-Highlight the lines starting `modelConfig:`, `systemMessage:`, `toolNames:` and `requireApproval:`.
+**Visible copy:**
 
-Four bullets, field name in bold:
+- `modelConfig` names the model configuration; `systemMessage` supplies instructions.
+- `toolNames` limits the tools offered to the model. `requireApproval` pauses listed operations in the runtime.
+- Six agents use kagent's ADK-based runtime. The BYO reporter owns its implementation.
 
-- **modelConfig** names a ModelConfig resource. Page 6.
-- **systemMessage** is the prompt. Inline here; a ConfigMap or kagent's snippets elsewhere. Page 7.
-- **toolNames** selects from a server's inventory. kagent-tools offers 124 tools; this agent sees 11.
-- **requireApproval** lists the calls that pause for a human. Six of the operator's 11.
+**Takeaway:** `An instruction asks for behavior; a runtime gate controls execution.`
 
-Footnote, secondary text: `kubectl apply creates the Deployment, Service and A2A endpoint. The pod runs kagent's runtime, built on Google ADK. No code.`
+**Small context line:** `Five ModelConfigs share an OpenRouter Secret. Full provider and prompt configuration is in the article.`
 
-### Page 5 · two kinds of agent
+**Source:** `infra/kagent/agents/sre-operator.yaml`. The excerpt's prompt is condensed, not a verbatim quotation. The deployed operator has 11 tools, six under approval; only one is shown here.
 
-Kicker: `STEP 1 · DECLARATIVE OR BRING YOUR OWN`
+## Page 6 · the custom MCP server
 
-Headline: `Two kinds of agent, one resource` (highlight "one resource" in indigo)
+**Kicker:** `BYO TOOL SERVER · NETPROBE`
 
-Two columns, each a card with a heading, a short code excerpt and three bullets. Left column indigo accent, right column cyan #0E7490 accent with a dashed outline, matching the agent cards on page 2.
+**Headline:** `Four Python functions become discoverable tools`
 
-Left heading: `type: Declarative` · caption `six agents here, including the orchestrator`
+**Main visual:** A compact tool table:
 
-Left code card, header `infra/kagent/agents/sre-operator.yaml · shortened`:
+| Tool | Input | Observation returned |
+|---|---|---|
+| `dns_lookup` | hostname | addresses and resolution status |
+| `tcp_connect` | host, port | connection status and time |
+| `http_check` | URL | HTTP status, latency and redirect target |
+| `tls_cert_expiry` | host; port defaults to 443 | certificate validity and remaining days |
 
-```yaml
-spec:
-  type: Declarative
-  declarative:
-    modelConfig: grok-4-7
-    systemMessage: |
-      ...
-    tools: [...]
-    # runtime: go   # python is the default
-```
+**Discovery strip, four readable labels in order:**
 
-Left bullets:
+`Separate tool files` → `Loader imports modules` → `@mcp.tool() registration` → `tools/list returns definitions`
 
-- You write the YAML. The controller creates the Deployment, Service and A2A endpoint.
-- The pod runs kagent's runtime, built on Google ADK. `runtime` picks the Python ADK (default) or the Go ADK.
-- MCP tools, A2A, sessions and the approval gate come with the runtime.
+**Visible copy:** `FastMCP supplies schemas, validation and MCP message handling. The probe functions perform the checks and return evidence.`
 
-Right heading: `type: BYO` · caption `one agent here: incident-reporter`
+**Takeaway:** `A resolved Service name does not prove there is a healthy backend.`
 
-Right code card, header `infra/kagent/agents/incident-reporter.yaml · shortened`:
+**Small note:** `Optional timeout arguments are omitted from this summary. Current output schemas describe a broad object; the detailed README explains the returned fields.`
 
-```yaml
-spec:
-  type: BYO
-  byo:
-    deployment:
-      image: <ECR>/incident-reporter-agent:0.1.0
-      env:
-        - name: KAGENT_TOOLS_URL
-          value: http://kagent-tools.kagent:8084/mcp
-```
+**Sources:** `byo/netprobe-mcp/README.md`; `docs/diagrams/07-netprobe-tool-discovery.jpg`; `results/raw/netprobe-call-*.json`. Keep the detailed schema diagram in the linked documentation rather than reproducing it at unreadable size.
 
-Right bullets:
+## Page 7 · the custom agent
 
-- You point at an image. kagent deploys it and calls it like any other agent.
-- The contract is one thing: serve A2A on port 8080. The model, prompt and loop live in the image.
-- Any framework that speaks A2A: Google ADK, LangGraph and CrewAI are in kagent's examples. Here it is a plain Python loop with the A2A SDK.
+**Kicker:** `BYO AGENT · INCIDENT REPORTER`
 
-Footnote, secondary text: `Both are the same Agent resource with a different type. Both appear to the orchestrator as tools.`
+**Headline:** `Python owns the loop. A2A serves the report.`
 
-### Page 6 · the model
+**Main visual:** Five numbered steps in one simple loop, using this exact text:
 
-Kicker: `STEP 1 · THE MODEL`
+1. `Discover and select MCP tools at startup`
+2. `Send the request and tool schemas to the model`
+3. `Run requested MCP tools and append observations`
+4. `Repeat until the model returns report text`
+5. `Publish an A2A incident-report artifact`
 
-Headline: `Five models, one key, one API shape` (highlight "one API shape" in indigo)
+Draw the loop-back only from step 3 to step 2; the report is the exit. Step 1 is startup setup outside the repeated loop. Use the existing `docs/diagrams/06-byo-agent-loop.jpg` as a correctness reference; do not shrink its full technical labels onto this page.
 
-Code card, header `infra/kagent/models/grok-4-7.yaml`:
+**Visible copy:** `I wrote the ReAct tool-calling loop. The A2A Python SDK handles the server interface; it does not supply the loop. The reporter selects six Kubernetes tools and four probes and proposes fixes without applying them.`
 
-```yaml
-apiVersion: kagent.dev/v1alpha2
-kind: ModelConfig
-metadata:
-  name: grok-4-7
-spec:
-  provider: OpenAI          # OpenRouter speaks the OpenAI API
-  model: x-ai/grok-4.7      # OpenRouter model id
-  apiKeySecret: kagent-openrouter
-  apiKeySecretKey: OPENROUTER_API_KEY
-  openAI:
-    baseUrl: https://openrouter.ai/api/v1
-```
+**Measured result:** `Scenario s12: all five configured faults diagnosed · 161 s · 21 tool calls.`
 
-Highlight the lines starting `provider:`, `model:` and `baseUrl:`.
+**Takeaway:** `The agent decides which evidence to gather; MCP servers execute the individual checks.`
 
-Screenshot card: `docs/screenshots/crops/ui-models-five.png`. Caption: `The five ModelConfigs in the kagent UI. Provider OpenAI on every row: OpenRouter speaks that API.`
+**Sources:** `byo/incident-reporter-agent/README.md`; `results/answers/incident-reporter/s12.json`. A 20-turn limit also terminates the loop; reaching it does not establish a complete report.
 
-Two bullets:
+## Page 8 · deploying both custom components
 
-- Every ModelConfig in this build has this shape. Only the name and the model id change.
-- One Secret, `kagent-openrouter`, serves all five. An agent picks its model by name.
+**Kicker:** `FROM CODE TO KUBERNETES`
 
-### Page 7 · the prompts
+**Headline:** `Two images, two resource contracts`
 
-Kicker: `STEP 1 · THE PROMPTS`
+**Introductory line:** `Both custom components were built as images and pushed to ECR. Their YAML describes how to run them.`
 
-Headline: `Three ways to give an agent its instructions` (highlight "its instructions" in indigo)
-
-Two code cards, stacked.
-
-First card, header `infra/kagent/agents/cluster-troubleshooter.yaml · shortened`:
+**First full-width code card:** `netprobe-mcpserver.yaml · selected fields`
 
 ```yaml
-promptTemplate:
-  dataSources:
-    - kind: ConfigMap
-      name: kagent-builtin-prompts
-      alias: builtin
-systemMessage: |
-  You are a Kubernetes troubleshooter for one Amazon EKS cluster.
-  {{include "builtin/kubernetes-context"}}
-  {{include "builtin/safety-guardrails"}}
-```
-
-Highlight the two `{{include` lines.
-
-Second card, header `infra/kagent/agents/sre-orchestrator.yaml · shortened`:
-
-```yaml
-systemMessageFrom:
-  type: ConfigMap
-  name: sre-orchestrator-prompt
-  key: system.md
-```
-
-Three bullets:
-
-- **Inline.** `systemMessage` holds the text, as on page 4.
-- **kagent's snippets.** `promptTemplate` makes the text a template; `{{include}}` pulls the methodology kagent ships for its own agents.
-- **A ConfigMap.** `systemMessageFrom` keeps a long prompt as its own object, reviewable in Git without touching the Agent.
-
-### Page 8 · an MCP server
-
-Kicker: `STEP 2 · ADD A TOOL SERVER`
-
-Headline: `An MCP server is a YAML file too` (highlight "YAML file too" in amber)
-
-Code card, header `infra/kmcp/netprobe-mcpserver.yaml · shortened`:
-
-```yaml
-apiVersion: kagent.dev/v1alpha1
 kind: MCPServer
-metadata:
-  name: netprobe-mcp
 spec:
-  transportType: http       # the container serves MCP itself
-  httpTransport: { targetPort: 3000, path: /mcp }
+  transportType: http
+  httpTransport: {targetPort: 3000, path: /mcp}
   deployment:
     image: <ECR>/netprobe-mcp:0.1.0
     port: 3000
-    cmd: python
-    args: [src/main.py, --transport, http]
 ```
 
-Highlight the lines starting `transportType:` and `image:`.
+Caption: `kmcp runs the tool server. FastMCP serves MCP at /mcp; the actual startup command binds to 0.0.0.0.`
 
-Screenshot card: `docs/screenshots/crops/ui-mcp-five-servers.png`. Caption: `Five tool sources discovered by kagent, 195 tools. fetch and netprobe-mcp are the two that kmcp runs.`
-
-Two bullets:
-
-- `netprobe-mcp` is four network probes written with FastMCP, scaffolded, built and pushed with the kmcp CLI. kmcp turns the resource into a Deployment and a Service.
-- A public stdio package needs no image at all: `fetch` runs on kmcp's default image behind an agentgateway adapter.
-
-### Page 9 · three kinds of tool source
-
-Kicker: `STEP 2 · WIRE TOOLS TO AN AGENT`
-
-Headline: `Three kinds of tool source, one field` (highlight "one field" in amber)
-
-Code card, header `infra/kagent/agents/runbook-assistant.yaml · shortened`:
+**Second full-width code card:** `incident-reporter.yaml · selected fields`
 
 ```yaml
-tools:
-  - type: McpServer
-    mcpServer:
-      kind: RemoteMCPServer   # kagent's own server, 124 tools
-      name: kagent-tool-server
-      toolNames: [k8s_get_resources, k8s_get_pod_logs]
-  - type: McpServer
-    mcpServer:
-      kind: MCPServer         # deployed by kmcp
-      name: fetch
-      toolNames: [fetch]
-  - type: McpServer
-    mcpServer:
-      kind: Service           # labelled kagent.dev/mcp-service
-      name: kagent-querydoc
-      toolNames: [query_documentation]
-```
-
-Highlight the three `kind:` lines.
-
-Three bullets, kind in bold:
-
-- **RemoteMCPServer** points at an MCP endpoint that already exists. kagent's chart registers its tool server and the Grafana server this way.
-- **MCPServer** is a server kmcp deploys and runs: `fetch` and `netprobe-mcp`.
-- **Service** is any Service carrying the `kagent.dev/mcp-service: "true"` label. Referencing querydoc any other way was rejected.
-
-Footnote, secondary text: `toolNames is the allow-list. A server's inventory is not the agent's tool set.`
-
-### Page 10 · agents as tools
-
-Kicker: `STEP 3 · DELEGATE`
-
-Headline: `The orchestrator's tools are agents` (highlight "are agents" in indigo)
-
-Code card, header `infra/kagent/agents/sre-orchestrator.yaml · shortened`:
-
-```yaml
+kind: Agent
 spec:
-  declarative:
-    modelConfig: claude-sonnet-5-5
-    systemMessageFrom:
-      type: ConfigMap
-      name: sre-orchestrator-prompt
-    tools:
-      - type: Agent
-        agent: { name: cluster-troubleshooter }
-      - type: Agent
-        agent: { name: sre-operator }
-      # four more specialists
+  type: BYO
+  byo:
+    deployment: {image: "<ECR>/incident-reporter-agent:0.1.0"}
 ```
 
-Highlight the two `type: Agent` lines.
+Caption: `kagent runs the custom agent. Its container serves A2A at / on port 8080; the model, prompt and loop belong to the application.`
 
-Screenshot card: `docs/screenshots/crops/k9s-agents-six.png`. Caption: `k9s, Agent resources: six of the seven agents before the orchestrator was added. incident-reporter is the BYO container; runbook-assistant was not yet accepted (page 9).`
+**Takeaway:** `MCPServer describes a tool server. Agent with type: BYO describes an agent container.`
 
-Three bullets:
+**Small note:** `Excerpts omit API versions, metadata, startup arguments, environment variables and Secret references. Use the complete manifests to deploy. fetch uses a pre-built package in kmcp's default image; it needs no custom image build.`
 
-- kagent exposes every agent over A2A. Listing one as `type: Agent` makes it callable like any other tool.
-- The specialist keeps its own model, prompt and allowed tools. The orchestrator sees only its description and its answer.
-- The BYO agent, incident-reporter, is called the same way. Its loop is Python; its interface is A2A.
+**Sources:** `infra/kmcp/netprobe-mcpserver.yaml`; `infra/kagent/agents/incident-reporter.yaml`; `docs/setup-guide.md`.
 
-### Page 11 · the approval gate
+## Page 9 · trying the interfaces yourself
 
-Kicker: `STEP 4 · THE GATE`
+**Kicker:** `INTERACTIVE WALKTHROUGHS`
 
-Headline: `Nothing changes until a human says so` (highlight "a human says so" in amber)
+**Headline:** `Start with the UI. Inspect the protocols next.`
 
-Three stacked rows, each a card with a left accent bar and a small-caps label on the left:
+**Main visual:** Three stacked cards with these labels and text:
 
-- Label `MODEL PICKS A TOOL`, slate bar: **The call is not executed.** `k8s_scale` is on the operator's requireApproval list, so the runtime stops before running it.
-- Label `TASK PAUSES`, amber bar, person-and-check mark: **The task returns input-required** with the exact call and its arguments. The human reads them.
-- Label `HUMAN DECIDES`, indigo bar: **Approve runs the call; reject discards it.** Same task, same context, one more message.
+- **Ask an agent.** Port-forward the kagent UI, select an agent and send a question. Expand tool calls and respond to input or approval prompts when they appear.
+- **Call MCP directly.** Run netprobe locally with uv, without a container. Use curl/jq or Postman: initialize, send the initialized notification, list tools, call a tool. No model is needed.
+- **Invoke the BYO agent.** Port-forward `svc/incident-reporter` on `8091:8080`. Read its card, then use A2A `message/send` or `message/stream`. The agent makes its own model and MCP calls.
 
-Two bullets:
+**Takeaway:** `MCP at /mcp and A2A at / are different interfaces; both have copyable examples in the repository.`
 
-- Approved: scale `web` to 3. Replicas went 2 → 3.
-- Rejected: scale `web` to 2. The tool never ran. Replicas stayed at 3.
+**Source line:** `Postman folders 4b and 6 · component READMEs · setup guide section 12`. Add a smaller note: `A2A at / refers to the direct reporter Service; the controller uses /api/a2a/... routes. The scripts remain available for repeatable runs.`
 
-Footnote, secondary text: `Enforced by the runtime, not the prompt. It held when the orchestrator called the operator.`
+## Page 10 · method and measured outcomes
 
-### Page 12 · one repair, two pauses
+**Kicker:** `RESULTS · EKS · 2026-10-07`
 
-Kicker: `THE TEST · SCENARIO 15`
+**Headline:** `15 scenarios: completion was not enough`
 
-Headline: `"Fix checkout so it has endpoints"` (highlight "Fix checkout" in indigo)
+**Method line:** `Five known faults: bad image, command exits 1, memory-limit OOM, Service without endpoints, and an unschedulable CPU request. Answers were evaluated against the configured faults and cluster evidence.`
 
-Five numbered steps, large numerals, actor in bold:
+**Main visual:** Four outcome rows or bars. Counts are counts, not percentage estimates:
 
-1. **Troubleshooter** finds the Service selects `app: checkout` but the pods are `app: web`.
-2. **Orchestrator** asks the human which backend it should use. Pause 1.
-3. **Human** answers. The orchestrator calls the operator with the exact patch.
-4. **Operator** stops on `k8s_patch_resource` for approval. Pause 2.
-5. **Human** approves. Selector patched. `kubectl` shows 3 endpoints.
+| Outcome across 15 numbered scenarios | Count |
+|---|---:|
+| Correct diagnosis or verified repair | **12** |
+| Partly incorrect answer | **1** |
+| Correct but incomplete answer | **1** |
+| Never completed | **1** |
 
-Screenshot card: `docs/screenshots/crops/s15-orchestrator-ask-user.png`. Caption: `Pause 1 in the kagent UI: the troubleshooter has completed and the orchestrator asks which backend to use, with the patch and the rollback spelled out.`
+**Two supporting facts:**
 
-Footnote, secondary text: `62 s of request time across three exchanges (32 + 16 + 14 s), 2 human decisions, 1 patch. Human thinking time not included.`
+- The troubleshooter diagnosed all five faults individually in **5–52 s** each.
+- Two additional direct approval tests behaved as intended: approved scale **2 → 3**; rejected scale left **3 → 3**.
 
-### Page 13 · how it was tested
+**Takeaway:** `Fourteen tasks completed; two of those answers had quality issues.`
 
-Kicker: `THE METHOD · FIVE FAULTS, FIFTEEN QUESTIONS`
+**Scope note:** `12 specialist questions + 3 orchestrator scenarios. s15 was added after the initial 14 questions. Retries and human follow-up messages are not extra scenarios. Two approval tests are additional cases.`
 
-Headline: `Known faults, checked answers` (highlight "checked answers" in indigo)
+**Sources:** `docs/article.md, Results`; `results/summary/scenarios.json`; `results/answers/`. The JSON summary records execution data, not accuracy grades.
 
-A five-row table with three columns, headers `Workload`, `Fault`, `Expected diagnosis`, in large readable type:
+## Page 11 · limitations and operational lessons
 
-| Workload | Fault | Expected diagnosis |
-|---|---|---|
-| `api` | image `nginx:1.99.99-does-not-exist` | ImagePullBackOff |
-| `worker` | prints "config file ... not found", exits 1 | CrashLoopBackOff |
-| `cache` | allocates 200 MiB under a 64 MiB limit | OOMKilled |
-| `checkout` Service | selector `app: checkout`, pods are `app: web` | no endpoints |
-| `batch` | requests 16 CPU on 4-CPU nodes | Pending, Insufficient cpu |
+**Kicker:** `WHAT DID NOT WORK`
 
-Three bullets:
+**Headline:** `The failures matter as much as the repair`
 
-- Fifteen questions sent over A2A through the controller by a script: twelve to specialists, three to the orchestrator. The approval flow was run twice, one approve and one reject.
-- Every answer was compared with this table and with `kubectl`. A completed task does not count as correct unless the diagnosis names the fault.
-- Raw A2A responses, answer text, REST and MCP responses and build logs are in the repository under `results/`.
+**Main visual:** Three stacked finding cards:
 
-Footnote, secondary text: `One cluster, one day, one run per specialist question. Orchestrator questions were retried while troubleshooting the timeout.`
+- **Long tasks:** scenario s13 never completed. Two controller attempts timed out at **180 s**; a direct retry was stopped manually because of cost. Streaming did not remove the controller deadline.
+- **Abandoned work:** overlapping requests exceeded the orchestrator's **1 GiB** limit. The manifest now sets **2 GiB**; later tests were serialized.
+- **Answer quality:** one answer listed `batch` as both healthy and unhealthy; another missed four cluster-wide firing alerts. A completed task did not prove a correct answer.
 
-### Page 14 · the numbers
+**Takeaway:** `Verify external state, inspect the answer and account for work after a client disconnects.`
 
-Kicker: `RESULTS · ONE CLUSTER, ONE DAY`
+**Scope note:** `One cluster and one specialist run per question. About USD 6 of model spend for the day, including retries; not per scenario and not the AWS infrastructure cost.`
 
-Headline: `What the numbers said` (highlight "numbers" in indigo)
+**Source:** `docs/build-record.md, sections 15–16`. Host-header discovery, the unavailable Go image and PromQL filtering are additional integration findings documented in the article; they do not need another slide.
 
-Four stat tiles in a 2 × 2 grid, number large in indigo, caption below:
+## Page 12 · what readers can take away and reproduce
 
-- `5 / 5` — faults diagnosed by the read-only YAML agent, 5 to 52 s each
-- `10 of 12` — specialist answers correct; one incomplete, one partly wrong
-- `1` — orchestrator task never completed: the controller cut it at 3 minutes
-- `≈ 6 USD` — model spend for the whole day, retries included
+**Kicker:** `READ MORE · TRY IT`
 
-One line under the grid, secondary text: `The five faults: bad image · crash loop · OOMKilled · Service with no endpoints · unschedulable pod.`
+**Headline:** `Inspect the mechanism. Reproduce the evidence.`
 
-### Page 15 · what broke
+**Three takeaways:**
 
-Kicker: `LIMITS · AND THE REPO`
+- Declarative specialists and a custom agent can share an A2A interface.
+- MCP exposes discoverable tool contracts; custom functions still own the actual checks.
+- Clarification and execution approval are different pauses, and both were exercised in the repair.
 
-Headline: `What broke` (highlight "broke" in amber)
+**Two next-step cards:**
 
-Three bullets, lead phrase bold:
+- **Understand the build:** article, component READMEs and the runtime/protocol reference.
+- **Try it:** setup guide, UI walkthrough, Postman collection, scripts and recorded JSON responses.
 
-- **Three-minute cut-off.** The controller ended `message/send` and `message/stream` at 180 s. The longest diagnosis never finished.
-- **Out of memory.** Three overlapping requests pushed the orchestrator past its default 1 GiB. The manifest now sets 2 GiB.
-- **Three integration fixes.** The Grafana MCP image's loopback-only Host check, a missing Go runtime image, and a Prometheus tool that rejects comparison operators.
+**Repository, printed clearly:** `github.com/tharindu-sankalpa/eks-kagent-sre-agents`
 
-Footer line, secondary text: `Measured on 2026-10-07. kagent 0.9.10 and kmcp 0.3.0 are pre-1.0; the Agent resource changes in kagent 1.0.`
+Link the repository text to `https://github.com/tharindu-sankalpa/eks-kagent-sre-agents`. Add a small clickable `Read the article` label linking to `https://github.com/tharindu-sankalpa/eks-kagent-sre-agents/blob/main/docs/article.md` until a published article URL exists. Do not print a placeholder URL.
 
-### Page 16 · where to go next
+**Footer:** `Recorded versions: kagent 0.9.10 · kmcp 0.3.0. The setup guide covers infrastructure costs and teardown; provisioned AWS resources incur charges.`
 
-Kicker: `READ MORE · BY THE TIME YOU HAVE`
+## Asset and evidence policy
 
-Headline: `Three layers, pick yours` (highlight "pick yours" in indigo)
+- Main architecture: **`docs/diagrams/01-system-overview.jpg` on page 2**, reused directly.
+- Repair screenshot: `docs/screenshots/crops/s15-orchestrator-ask-user.png` on page 3 if readable. It is a separate UI run; the original API results supply the measured timing and endpoint verification.
+- The new `07-netprobe-tool-discovery.jpg` and existing `06-byo-agent-loop.jpg` are source references for pages 6–7 and remain embedded at useful resolution in the component documentation/article.
+- Do not use the AKS pod screenshot or the 2026-10-18 Langfuse trace to illustrate the original EKS measurements without an explicit later-run label. They are not necessary for this summary.
+- Full MCP results: `results/raw/netprobe-call-dns_lookup.json`, `netprobe-call-tcp_connect.json`, `netprobe-call-http_check.json`, `netprobe-call-tls_cert_expiry.json` and `kagent-tools-tools-list.json`.
+- Reporter evidence: `results/answers/incident-reporter/s12.json` and `s12.txt`. Scenario listing: `scripts/scenarios.txt` for s01–s14; s15 and its human exchanges are in build-record section 16. Outcome verdicts are in the article.
 
-Three stacked rows, each a card with a left accent bar, a bold time label on the left and text on the right:
+## Checklist before exporting and posting
 
-- Label `10 minutes`, indigo bar: **This document.** The system, the YAML, the gate, one repair and the numbers.
-- Label `30 minutes`, violet #7C3AED bar: **The article.** The reasoning behind each choice, the method, every result and the limitations. `<ARTICLE_URL>`
-- Label `As long as you like`, amber bar: **The repository.** Setup guide in dependency order, the original build record with every command and output, the runtime and protocol reference, manifests, the custom MCP server and agent, scripts, the Postman collection and raw responses. `github.com/tharindu-sankalpa/eks-kagent-sre-agents`
-
-Footnote, secondary text: `Links are not clickable in a LinkedIn document; both URLs are in the post text.`
-
----
-
-## Checklist before posting
-
-- Sixteen pages, A4 portrait, every page numbered n/16.
-- Page 1 names the use case, the three technologies and the repository URL, has four numbered points, and carries the one illustration.
-- Page 2 has exactly six specialist cards, six arrowheads from the spine, no arrow between two specialists, and two person-and-check marks (release-manager, sre-operator). The caption is two lines and "ap-south-1" is unbroken.
-- Pages 4 to 10: every YAML line matches this file, including the `#` comments. Nothing runs off a page.
-- Diagram cards on page 2 have solid 3 px outlines; arrows have filled heads.
-- Six screenshot crops placed unaltered, from `docs/screenshots/crops/`, each with its caption: pages 3, 6, 8, 10 and 12. The two on page 3 show the AWS header and breadcrumb.
-- Page 13 matches the README fault table; page 14 numbers match the README results table.
-- Replace `<ARTICLE_URL>` on page 16 once the article is published; it is also in the post text.
-- Nothing printed that is not in this file.
+- Twelve A4 portrait pages, every page numbered `n/12`, with no old `n/16` footers.
+- Cover uses “multi-agent system,” describes the SRE purpose and includes one measured outcome.
+- Page 2 uses the actual main architecture image, without redrawing, cropping, stretching or swapping it for a simplified graph.
+- The repair appears before configuration details. User input is distinct from execution approval.
+- netprobe and the reporter each have a dedicated page. FastMCP and the A2A Python SDK are credited for their actual roles; the custom loop is not attributed to ADK.
+- YAML excerpts have source labels and are visibly partial. No wrapped image tags, dropped indentation or implication that the snippets are deployable as shown.
+- Page 10 counts sum to 15. Approval tests, retries and human follow-ups are distinguished from those 15 scenarios.
+- Task completion is not presented as accuracy. Scope, versions, timing exclusions and the daily cost boundary remain visible.
+- Source assets and code names match the repository. No later AKS/local evidence is passed off as original EKS output.
+- No unresolved URL placeholders, private account labels, internal hostnames or credentials in the export.
+- Inspect all exported pages visually, including pages with the most content. No cropped screenshot edges, missing captions, footer collisions or content outside the page. Check at phone width and 100% on desktop.
+- Open the final PDF and test its links. Include repository/article destinations in the accompanying [LinkedIn post](linkedin-post.md).
