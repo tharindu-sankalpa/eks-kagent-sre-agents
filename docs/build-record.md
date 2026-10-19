@@ -1,4 +1,4 @@
-# Build record: multi-agent SRE workflows on Amazon EKS
+# Build record: a multi-agent system for SRE workflows on Amazon EKS
 
 This is the chronological record of the build and tests on 2026-10-07. It preserves the commands, recorded outputs, screenshots, failed attempts and fixes. Use the [setup guide](setup-guide.md) for the current dependency order and copyable commands; this record includes actions that were later corrected.
 

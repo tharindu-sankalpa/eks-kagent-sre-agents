@@ -1,6 +1,6 @@
-# Setup guide: multi-agent SRE workflows on Amazon EKS
+# Setup guide: a multi-agent system for SRE workflows on Amazon EKS
 
-This guide deploys seven agents: an orchestrator that uses six specialists as tools, including one custom incident reporter. kagent runs the declarative agents and supplies operational tools; kmcp deploys additional Model Context Protocol (MCP) servers. The tests cover diagnosis, delegated repair and human approval before changes.
+This guide deploys a multi-agent system for SRE workflows with seven agents: an orchestrator that uses six specialists as tools, including one custom incident reporter. kagent runs the declarative agents and supplies operational tools; kmcp deploys additional Model Context Protocol (MCP) servers. The tests cover diagnosis, delegated repair and human approval before changes.
 
 The steps are ordered so each one has what it needs from the one before. They were rebuilt from the final configuration and the 2026-10-07 build. On 2026-10-13, the operator reported following the guide and successfully completing the section 12 web UI walkthrough; the [follow-up record](build-record.md#follow-up-web-ui-validation-2026-10-13) describes the supplied screenshot evidence. For more detail, see the [build record](build-record.md) (original commands, outputs and investigations), the [article](article.md) (how the workflow works) and the [runtime reference](runtime-and-protocols.md) (how the pieces talk to each other).
 

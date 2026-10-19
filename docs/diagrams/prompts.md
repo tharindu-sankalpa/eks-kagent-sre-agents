@@ -81,7 +81,7 @@ Visual direction: use the latest regenerated image as a reference for the compon
 The role colours below refine the shared agent style for this overview. Use the same role accents when generating the other diagrams; agent cards retain the same shape across roles. Colour is an aid to scanning, while labels, icons and line styles carry the meaning.
 
 ```text
-Create a polished technical architecture illustration of multi-agent SRE workflows on Amazon EKS. Output a high-resolution 16:9 landscape raster image. All directions below are private; print only the quoted labels and captions. No extra title, layout terminology or invented text.
+Create a polished technical architecture illustration of a multi-agent system for SRE workflows on Amazon EKS. Output a high-resolution 16:9 landscape raster image. All directions below are private; print only the quoted labels and captions. No extra title, layout terminology or invented text.
 
 VISUAL STYLE — PRIVATE:
 Use a white canvas, near-white group panels, crisp sans-serif typography such as Inter, consistent rounded corners, fine borders and generous whitespace. Text is dark slate #0F172A; secondary text is #475569. Component names are medium bold, captions smaller but clearly readable. Wrap long agent names onto two lines without abbreviating them. Avoid condensed type, tiny footnotes, broad grey backgrounds, heavy black outlines, gradients, 3D objects, glows and decorative textures.

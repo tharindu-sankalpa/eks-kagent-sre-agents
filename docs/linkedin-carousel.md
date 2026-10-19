@@ -51,9 +51,9 @@ Design a 16-page document for a LinkedIn document post (PDF carousel) that also 
 
 ### Page 1 · cover
 
-Kicker: `MULTI-AGENT ORCHESTRATION · SRE WORKFLOWS ON AMAZON EKS`
+Kicker: `MULTI-AGENT SYSTEM · SRE WORKFLOWS ON AMAZON EKS`
 
-Headline: `Multi-agent SRE workflows on Amazon EKS with kagent and kmcp` (highlight "kagent and kmcp" in indigo)
+Headline: `A multi-agent system for SRE workflows on Amazon EKS with kagent and kmcp` (highlight "kagent and kmcp" in indigo)
 
 Standfirst, one paragraph in secondary text, about 34 px: `An orchestrator uses six specialist agents as tools to diagnose Kubernetes faults and coordinate repairs. A human approves every change, including changes requested by another agent.`
 

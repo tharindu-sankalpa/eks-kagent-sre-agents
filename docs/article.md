@@ -1,6 +1,6 @@
-# Multi-agent SRE workflows on Amazon EKS with kagent and kmcp
+# A multi-agent system for SRE workflows on Amazon EKS with kagent and kmcp
 
-I built and tested multi-agent orchestration for SRE workflows on Amazon EKS using kagent and kmcp. An orchestrator uses specialist agents as tools to diagnose Kubernetes faults and coordinate repairs. Before a change runs, the operator's approval gate pauses execution and surfaces the proposed tool call to the user—even when another agent called the operator.
+I built and tested a multi-agent system for SRE workflows on Amazon EKS using kagent and kmcp. An orchestrator uses specialist agents as tools to diagnose Kubernetes faults and coordinate repairs. Before a change runs, the operator's approval gate pauses execution and surfaces the proposed tool call to the user—even when another agent called the operator.
 
 Six of the seven agents are defined in YAML: a model reference, system instructions and allowed tool calls. kagent deploys them and supplies the built-in operational tools. Its Python runtime builds on Google's Agent Development Kit (ADK). kmcp deploys Model Context Protocol (MCP) tool servers, including a network-probe server I developed. The seventh agent is my own Python tool-calling loop, exposed through the Agent-to-Agent (A2A) protocol.
 

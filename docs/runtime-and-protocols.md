@@ -1,6 +1,6 @@
 # Runtime and protocol reference
 
-This reference explains the layers beneath the [multi-agent SRE workflow](article.md). It retains the resource fields, tool inventory, wire formats and deployment boundaries without requiring the article reader to follow every protocol detail. The implementation and recorded tests use kagent 0.9.10 and kmcp 0.3.0.
+This reference explains the layers beneath the [multi-agent system for SRE workflows](article.md). It retains the resource fields, tool inventory, wire formats and deployment boundaries without requiring the article reader to follow every protocol detail. The implementation and recorded tests use kagent 0.9.10 and kmcp 0.3.0.
 
 ## Contents
 

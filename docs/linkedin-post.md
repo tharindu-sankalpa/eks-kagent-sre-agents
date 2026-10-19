@@ -1,4 +1,4 @@
-I built and tested multi-agent orchestration for SRE workflows on Amazon EKS using kagent and kmcp. An orchestrator uses specialist agents as tools to diagnose Kubernetes faults and coordinate repairs, with human approval preserved across delegated calls.
+I built and tested a multi-agent system for SRE workflows on Amazon EKS using kagent and kmcp. An orchestrator uses specialist agents as tools to diagnose Kubernetes faults and coordinate repairs, with human approval preserved across delegated calls.
 
 Six of the seven agents are YAML configurations: a model, system instructions and allowed tools. kagent deploys them, runs them through its Google Agent Development Kit (ADK)-based Python runtime and supplies built-in tools for Kubernetes, Helm and Prometheus. kmcp deploys the additional MCP servers.
 
