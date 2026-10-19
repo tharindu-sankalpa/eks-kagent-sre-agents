@@ -2,7 +2,7 @@
 
 I built and tested a multi-agent system for SRE workflows on Amazon EKS using kagent and kmcp. An orchestrator uses specialist agents as tools to diagnose Kubernetes faults and coordinate repairs. Agents can pause to ask the user for missing information or clarify the intended repair. Before a change runs, the operator's approval gate also pauses execution and surfaces the proposed tool call to the user—even when another agent called the operator.
 
-Six of the seven agents in this multi-agent system are declarative: their model reference, system instructions and allowed tool calls are defined in YAML. kagent deploys them using its runtime built on Google's Agent Development Kit (ADK). kagent also supports bring-your-own (BYO) agents: custom containers that serve the Agent-to-Agent (A2A) protocol. The seventh agent, the incident reporter, follows this path. I wrote its Python ReAct tool-calling loop myself rather than using a framework's built-in loop; the A2A Python SDK handles the server interface.
+Six of the seven agents in this multi-agent system are declarative: their model reference, system instructions and allowed tool calls are defined with an `Agent` custom resource in YAML. kagent deploys them using its runtime built on Google's Agent Development Kit (ADK). kagent also supports bring-your-own (BYO) agents: custom containers that serve the Agent-to-Agent (A2A) protocol. The seventh agent, the incident reporter, follows this path. I wrote its Python ReAct tool-calling loop myself rather than using a framework's built-in loop; the A2A Python SDK handles the server interface.
 
 The kagent Helm installation comes with built-in Model Context Protocol (MCP) tool servers for Kubernetes, Helm, Prometheus, Grafana, Argo Rollouts and other operational systems. We can deploy existing MCP server packages for Node.js or Python, such as the documentation-fetch server, through kmcp by defining an `MCPServer` custom resource in YAML. kmcp can also deploy MCP servers from custom container images. My BYO network-probe server is built with FastMCP and deployed through kmcp. For declarative agents, YAML defines the agent's behaviour for kagent's runtime. For MCP servers, YAML tells kmcp how to run a server whose tools are already implemented in the package or container image.
 
@@ -32,7 +32,9 @@ Repository: https://github.com/tharindu-sankalpa/eks-kagent-sre-agents
   - [Defining an agent in YAML](#defining-an-agent-in-yaml)
   - [Specialists and custom implementations](#specialists-and-custom-implementations)
     - [Custom MCP tools: checking the network from inside the cluster](#custom-mcp-tools-checking-the-network-from-inside-the-cluster)
+      - [Try the MCP server without a container](#try-the-mcp-server-without-a-container)
     - [Custom agent: owning the tool-calling loop](#custom-agent-owning-the-tool-calling-loop)
+      - [Invoke the deployed agent directly](#invoke-the-deployed-agent-directly)
   - [Deployment choices](#deployment-choices)
   - [Method](#method)
   - [Results](#results)
@@ -182,6 +184,90 @@ Kubernetes state can explain a bad selector, but an SRE also needs to test wheth
 
 The server uses `httpx` for HTTP and `certifi` for a consistent TLS trust bundle. Its image was 98 MB. kmcp supplied the scaffold and build path; the probe functions are the custom implementation. The [component README](../byo/netprobe-mcp/README.md) documents inputs, outputs, local execution and extension.
 
+#### Try the MCP server without a container
+
+The probe functions and MCP interface can run independently of Kubernetes, kmcp and any language model. From the repository root, start the Python server and leave it running:
+
+```bash
+cd byo/netprobe-mcp
+uv sync
+uv run python src/main.py --transport http --host 127.0.0.1 --port 3000
+```
+
+In another terminal, initialize the MCP connection. Save the response headers separately so they do not get passed to jq:
+
+```bash
+MCP_URL='http://127.0.0.1:3000/mcp'
+MCP_HEADERS=$(mktemp)
+MCP_INIT=$(mktemp)
+
+curl -sSN "$MCP_URL" -D "$MCP_HEADERS" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"article-curl","version":"1.0"}}}' |
+sed -E '/^(event:|id:|retry:|:)/d; s/^data: *//' | jq . | tee "$MCP_INIT"
+
+MCP_SESSION_ID=$(awk 'tolower($1) == "mcp-session-id:" {sub(/\r$/, "", $2); print $2}' "$MCP_HEADERS")
+MCP_PROTOCOL_VERSION=$(jq -r '.result.protocolVersion' "$MCP_INIT")
+```
+
+Check that initialization succeeded and returned the requested protocol version before continuing. `Mcp-Session-Id` comes from the server; the JSON-RPC `id` identifies one request. The response can be JSON or Server-Sent Events (SSE), with JSON inside `data:` lines. The `sed` step removes that framing for jq; it handles the single-line events produced here, rather than every possible SSE format.
+
+Next, send the initialized notification, then discover the tools and their schemas:
+
+```bash
+curl -sSN "$MCP_URL" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H "Mcp-Session-Id: $MCP_SESSION_ID" \
+  -H "MCP-Protocol-Version: $MCP_PROTOCOL_VERSION" \
+  --data '{"jsonrpc":"2.0","method":"notifications/initialized"}' |
+sed -E '/^(event:|id:|retry:|:)/d; s/^data: *//' | jq .
+
+curl -sSN "$MCP_URL" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H "Mcp-Session-Id: $MCP_SESSION_ID" \
+  -H "MCP-Protocol-Version: $MCP_PROTOCOL_VERSION" \
+  --data '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' |
+sed -E '/^(event:|id:|retry:|:)/d; s/^data: *//' | jq .
+```
+
+The notification has no request `id` and normally returns HTTP 202 with an empty body, so jq prints nothing. `tools/list` should return the four probe definitions. Now call one:
+
+```bash
+curl -sSN "$MCP_URL" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H "Mcp-Session-Id: $MCP_SESSION_ID" \
+  -H "MCP-Protocol-Version: $MCP_PROTOCOL_VERSION" \
+  --data '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"dns_lookup","arguments":{"hostname":"example.com"}}}' |
+sed -E '/^(event:|id:|retry:|:)/d; s/^data: *//' | jq .
+
+rm "$MCP_HEADERS" "$MCP_INIT"
+```
+
+Inspect `result.structuredContent.resolved` and `addresses`; the actual addresses depend on DNS at the time. The function runs on the laptop here. Calling a port-forwarded netprobe server instead runs the same check from its pod, where Kubernetes Service names and connectivity have meaning. The [MCP README walkthrough](../byo/netprobe-mcp/README.md#call-the-mcp-server-manually-with-curl-and-jq) continues with TCP, HTTP, TLS, failed DNS and protocol/tool errors, following the [MCP initialization lifecycle](https://modelcontextprotocol.io/specification/2025-03-26/basic/lifecycle).
+
+For comparison, these selected fields come from the [recorded in-cluster DNS response](../results/raw/netprobe-call-dns_lookup.json), which checked `checkout` rather than the local example's public hostname:
+
+```json
+{
+  "result": {
+    "structuredContent": {
+      "resolved": true,
+      "addresses": ["10.100.237.153"],
+      "canonical_name": "checkout.demo-broken.svc.cluster.local"
+    },
+    "isError": false
+  }
+}
+```
+
+DNS resolved even though the Service had no endpoints. The separate [TCP response](../results/raw/netprobe-call-tcp_connect.json) records the connection failure; the [HTTP response](../results/raw/netprobe-call-http_check.json) checks the kagent UI, and the [TLS response](../results/raw/netprobe-call-tls_cert_expiry.json) checks a public certificate. The [built-in tool catalogue](../results/raw/kagent-tools-tools-list.json) contains the operational tool definitions and schemas. These are recorded responses, not outputs readers need to reproduce byte for byte.
+
+For Postman, import the [existing collection](../postman/kagent.postman_collection.json), set `netprobe_url` to `http://127.0.0.1:3000` and open **4b · Call the bring-your-own MCP server directly**. Send initialize, the initialized notification, `tools/list`, then the four tool calls. Initialization saves `netprobe_session_id`. Inspect the raw bodies and use public targets for a local server; the original Service examples expect an in-cluster server. The [README's Postman section](../byo/netprobe-mcp/README.md#use-the-postman-collection) explains the variables and response checks.
+
 ![Five discovered tool sources in the kagent UI](screenshots/kagent-ui-mcp-tools-five-servers.png)
 
 *Two `RemoteMCPServer` resources offered 124 and 65 tools; two kmcp-managed `MCPServer` resources offered one and four; a labelled Service offered documentation search. Total: 195 tools. Each agent sees only its selected subset.*
@@ -195,6 +281,47 @@ When the model requests a tool, the loop routes the call to the server that owns
 The A2A SDK wrapper emits `working` updates per tool step, publishes the report as an artifact and ends in `completed` or `failed`. kagent requires port 8080, an agent card at `/.well-known/agent-card.json` and A2A 0.3 JSON-RPC at `/`. The card is also the readiness endpoint. The controller publishes its own card and injects `KAGENT_NAME`, `KAGENT_NAMESPACE` and `KAGENT_URL`.
 
 The image was 57 MB and its pod became Ready in 19 s. The report scenario diagnosed all five faults in 161 s with 21 tool calls, including DNS, TCP and HTTP probes of `checkout`. The [protocol reference](runtime-and-protocols.md#the-custom-agent-boundary) covers the request loop and container contract in detail.
+
+#### Invoke the deployed agent directly
+
+The reporter needs model credentials and both MCP servers before it starts serving. To explore its interface, use the deployed instance: keep this port-forward running in a terminal pointed at the intended cluster.
+
+```bash
+kubectl -n kagent port-forward svc/incident-reporter 8091:8080
+```
+
+In another terminal, read the agent card and send the report request:
+
+```bash
+AGENT_URL='http://127.0.0.1:8091'
+curl -sS "$AGENT_URL/.well-known/agent-card.json" | jq .
+
+curl -sS --max-time 600 "$AGENT_URL/" \
+  -H 'Content-Type: application/json' \
+  --data "$(jq -n --arg message_id "$(uuidgen)" '{
+    jsonrpc:"2.0", id:"report-1", method:"message/send",
+    params:{message:{role:"user",kind:"message",messageId:$message_id,
+      parts:[{kind:"text",text:"Write an incident report for namespace demo-broken."}]}}
+  }')" | jq .
+```
+
+This is A2A at `/`, not MCP at `/mcp`: there is no MCP initialize/list/call handshake on this endpoint. The reporter's own MCP clients do that work when it starts. The A2A response carries the task state and the report in `result.artifacts[].parts[].text`. Changing the method to `message/stream` exposes the reporter's tool-step updates as SSE; the [agent README](../byo/incident-reporter-agent/README.md#watch-tool-steps-with-messagestream) gives the complete curl/jq example. Each request invokes the model and can incur provider charges.
+
+The [original s12 response](../results/answers/incident-reporter/s12.json) includes these selected fields, with the report text omitted here:
+
+```json
+{
+  "result": {
+    "kind": "task",
+    "status": {"state": "completed"},
+    "artifacts": [{"name": "incident-report"}]
+  }
+}
+```
+
+The [readable report](../results/answers/incident-reporter/s12.txt) contains the diagnoses, quoted evidence and proposed fixes. The [scenario summary JSON](../results/summary/scenarios.json) records task states and tool counts across the scenarios; the Results section below adds the accuracy verdicts, which task completion alone cannot establish.
+
+The existing Postman collection invokes agents through the controller. Port-forward `svc/kagent-controller` on `8083:8083`, set `base_url=http://127.0.0.1:8083`, `ns=kagent` and `agent=incident-reporter`, then use **6 · Invoke an agent (A2A)**. Duplicate its generic `message/send` request and replace the question with the report request above. To use the direct port-forward instead, change the duplicated request's URL to `http://127.0.0.1:8091/`; changing `base_url` alone would leave the controller's `/api/a2a/...` path attached. The [agent README](../byo/incident-reporter-agent/README.md) explains the code, configuration, task states and both invocation paths.
 
 ![The incident-reporter container: the A2A SDK server, the startup discovery step and the agent.py loop, with the kagent controller, OpenRouter and the two MCP servers outside](diagrams/06-byo-agent-loop.jpg)
 
@@ -303,6 +430,4 @@ Most of the day's roughly 6 USD of model spend was attributed in the original no
 
 Start with the [setup guide](setup-guide.md). The [build record](build-record.md) contains every original command and output; the [runtime and protocol reference](runtime-and-protocols.md) explains the resource fields, transports and API boundaries. All chart values and manifests are in `infra/`.
 
-You need AWS access with eight spare on-demand vCPUs in the region, Docker, the command-line tools listed in the guide and an OpenRouter API key. AWS bills the EKS control plane, nodes, NAT gateway, storage and ECR images while they exist. The hourly total was not calculated; teardown is included. The original cluster was deleted after testing, and the two image repositories were retained.
-
-Repository: https://github.com/tharindu-sankalpa/eks-kagent-sre-agents. Markdown tables may need adaptation for the article publisher's editor. The diagrams are generated from `diagrams/prompts.md`; the screenshots are from the recorded build.
+You need AWS access with eight spare on-demand vCPUs in the region, Docker, the command-line tools listed in the guide and an OpenRouter API key. AWS bills the EKS control plane, nodes, NAT gateway, storage and ECR images while they exist. The hourly total was not calculated; teardown is included.
