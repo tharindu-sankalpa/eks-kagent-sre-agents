@@ -2,6 +2,10 @@
 
 I built and tested a multi-agent system for SRE workflows on Amazon EKS using kagent and kmcp. An orchestrator uses specialist agents as tools to diagnose Kubernetes faults and coordinate repairs. Agents can pause to ask the user for missing information or clarify the intended repair. Before a change runs, the operator's approval gate also pauses execution and surfaces the proposed tool call to the user—even when another agent called the operator.
 
+![System overview: SRE, kagent controller, sre-orchestrator, six specialist agents, five MCP tool servers, demo-broken and monitoring targets, platform strip](diagrams/01-system-overview.jpg)
+
+*The system. An SRE reaches the orchestrator through the kagent controller over A2A; the orchestrator delegates to six specialists, which use selected tools on five MCP servers; the tools act on the demo namespace and the monitoring stack. kmcp, PostgreSQL and kagent are the platform underneath.*
+
 Six of the seven agents in this multi-agent system are declarative: their model reference, system instructions and allowed tool calls are defined with an `Agent` custom resource in YAML. kagent deploys them using its runtime built on Google's Agent Development Kit (ADK). kagent also supports bring-your-own (BYO) agents: custom containers that serve the Agent-to-Agent (A2A) protocol. The seventh agent, the incident reporter, follows this path. I wrote its Python ReAct tool-calling loop myself rather than using a framework's built-in loop; the A2A Python SDK handles the server interface.
 
 The kagent Helm installation comes with built-in Model Context Protocol (MCP) tool servers for Kubernetes, Helm, Prometheus, Grafana, Argo Rollouts and other operational systems. We can deploy existing MCP server packages for Node.js or Python, such as the documentation-fetch server, through kmcp by defining an `MCPServer` custom resource in YAML. kmcp can also deploy MCP servers from custom container images. My BYO network-probe server is built with FastMCP and deployed through kmcp. For declarative agents, YAML defines the agent's behaviour for kagent's runtime. For MCP servers, YAML tells kmcp how to run a server whose tools are already implemented in the package or container image.
@@ -12,7 +16,7 @@ The test environment was one EKS 1.34 cluster in `ap-south-1`, with two `t3.xlar
 
 *The EKS test cluster in `ap-south-1`: two `t3.xlarge` On-Demand nodes, both Ready.*
 
-![k9s showing demo-broken pods: api in ImagePullBackOff, batch Pending, cache and worker in CrashLoopBackOff, and two Running web pods](screenshots/image.png)
+![k9s showing demo-broken pods: api in ImagePullBackOff, batch Pending, cache and worker in CrashLoopBackOff, and two Running web pods](screenshots/k9s-demo-broken-aks-pods.png)
 
 *The demo workloads in k9s during a later AKS run: image-pull failures, a pending pod and restarting containers alongside two healthy `web` pods. This screenshot illustrates the workloads; the test results reported here are from EKS.*
 
@@ -32,8 +36,10 @@ Repository: https://github.com/tharindu-sankalpa/eks-kagent-sre-agents
   - [Defining an agent in YAML](#defining-an-agent-in-yaml)
   - [Specialists and custom implementations](#specialists-and-custom-implementations)
     - [Custom MCP tools: checking the network from inside the cluster](#custom-mcp-tools-checking-the-network-from-inside-the-cluster)
+      - [Deploy the custom MCP server with YAML](#deploy-the-custom-mcp-server-with-yaml)
       - [Try the MCP server without a container](#try-the-mcp-server-without-a-container)
     - [Custom agent: owning the tool-calling loop](#custom-agent-owning-the-tool-calling-loop)
+      - [Deploy the BYO agent with YAML](#deploy-the-byo-agent-with-yaml)
       - [Invoke the deployed agent directly](#invoke-the-deployed-agent-directly)
   - [Deployment choices](#deployment-choices)
   - [Method](#method)
@@ -43,10 +49,6 @@ Repository: https://github.com/tharindu-sankalpa/eks-kagent-sre-agents
   - [Reproduce it](#reproduce-it)
 
 For request fields, tool inventories and transport details, see the [runtime and protocol reference](runtime-and-protocols.md). For copyable deployment commands, use the [setup guide](setup-guide.md). The [build record](build-record.md) retains the complete investigation and outputs.
-
-![System overview: SRE, kagent controller, sre-orchestrator, six specialist agents, five MCP tool servers, demo-broken and monitoring targets, platform strip](diagrams/01-system-overview.jpg)
-
-*The system. An SRE reaches the orchestrator through the kagent controller over A2A; the orchestrator delegates to six specialists, which use selected tools on five MCP servers; the tools act on the demo namespace and the monitoring stack. kmcp, PostgreSQL and kagent are the platform underneath.*
 
 ## Delegation and approval in one repair
 
@@ -77,6 +79,10 @@ The two pauses serve different purposes. The first asks which change the user in
 *Scenario 15 as a logical sequence: twelve messages, two human pauses and one patch. The controller hop and the operator's individual MCP reads are omitted; the operator's pending patch runs only after the second decision.*
 
 The direct operator tests checked execution approval separately. Approving a scale changed `web` from two to three replicas. Rejecting the opposite change left it at three. The replica counts were checked before and after; the rejected tool call did not execute.
+
+![Langfuse showing the ask_user question about checkout's intended backend, four repair choices, the recorded answer selecting web, and delegation to sre-operator](screenshots/langfuse-orchestrator-operator-trace.png)
+
+*A later Langfuse trace from 2026-10-18 shows the `ask_user` exchange: the backend-selection question, four choices and the recorded answer to repoint `checkout` to `app=web`. The trace tree also shows delegation to `sre_operator` and its Kubernetes tool calls. These choices and timings belong to this later run, rather than the original EKS scenario 15 measurements.*
 
 ## What the frameworks provide
 
@@ -184,6 +190,41 @@ Kubernetes state can explain a bad selector, but an SRE also needs to test wheth
 
 The server uses `httpx` for HTTP and `certifi` for a consistent TLS trust bundle. Its image was 98 MB. kmcp supplied the scaffold and build path; the probe functions are the custom implementation. The [component README](../byo/netprobe-mcp/README.md) documents inputs, outputs, local execution and extension.
 
+![netprobe Python files, FastMCP registration and discovery, and the four tools' input contracts and returned fields](diagrams/07-netprobe-tool-discovery.jpg)
+
+*Each probe has its own Python module. The loader imports those modules, their decorators register tools on the shared FastMCP instance, and clients discover the definitions with `tools/list`. Input schemas declare arguments; the current output schemas declare only an object, while the cards describe the fields returned by the functions.*
+
+#### Deploy the custom MCP server with YAML
+
+After building and pushing the image, an `MCPServer` resource tells kmcp how to run it. This is the [netprobe manifest](../infra/kmcp/netprobe-mcpserver.yaml), with explanatory comments omitted. Replace `<ACCOUNT_ID>` with the ECR account used for the build; the [setup guide](setup-guide.md#8-build-and-deploy-the-custom-mcp-server) contains the build, push and apply commands.
+
+```yaml
+apiVersion: kagent.dev/v1alpha1
+kind: MCPServer
+metadata:
+  name: netprobe-mcp
+  namespace: kagent
+spec:
+  transportType: http
+  httpTransport:
+    targetPort: 3000
+    path: /mcp
+  deployment:
+    image: <ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/netprobe-mcp:0.1.0
+    port: 3000
+    cmd: python
+    args:
+      - src/main.py
+      - --transport
+      - http
+      - --host
+      - 0.0.0.0
+      - --port
+      - "3000"
+```
+
+The tool functions and their schemas live in the image; the YAML selects that image, startup command, transport and port. kmcp creates the Deployment and Service. FastMCP already serves HTTP at `/mcp`, so this deployment needs no stdio-to-HTTP adapter. Agents reach it at `http://netprobe-mcp.kagent:3000/mcp`. These deployment settings do not define a model or an agent loop.
+
 #### Try the MCP server without a container
 
 The probe functions and MCP interface can run independently of Kubernetes, kmcp and any language model. From the repository root, start the Python server and leave it running:
@@ -233,6 +274,10 @@ curl -sSN "$MCP_URL" \
 sed -E '/^(event:|id:|retry:|:)/d; s/^data: *//' | jq .
 ```
 
+![Two terminals showing netprobe running locally with FastMCP, MCP initialization, the initialized notification and the start of the tools/list response](screenshots/netprobe-local-http-initialize-tools-list.png)
+
+*The local walkthrough on 2026-10-19. The left terminal shows all four tools loading and the HTTP server starting; the right shows the initialization response, the notification and tool discovery. The startup log records HTTP 202 for the notification.*
+
 The notification has no request `id` and normally returns HTTP 202 with an empty body, so jq prints nothing. `tools/list` should return the four probe definitions. Now call one:
 
 ```bash
@@ -248,6 +293,10 @@ rm "$MCP_HEADERS" "$MCP_INIT"
 ```
 
 Inspect `result.structuredContent.resolved` and `addresses`; the actual addresses depend on DNS at the time. The function runs on the laptop here. Calling a port-forwarded netprobe server instead runs the same check from its pod, where Kubernetes Service names and connectivity have meaning. The [MCP README walkthrough](../byo/netprobe-mcp/README.md#call-the-mcp-server-manually-with-curl-and-jq) continues with TCP, HTTP, TLS, failed DNS and protocol/tool errors, following the [MCP initialization lifecycle](https://modelcontextprotocol.io/specification/2025-03-26/basic/lifecycle).
+
+![curl and jq showing a dns_lookup call for example.com, with resolved true, returned addresses and isError false](screenshots/netprobe-dns-lookup-curl-jq.png)
+
+*The local DNS call returns request `id: 3`, `resolved: true` and `isError: false`. The same observation appears as JSON text in `content` and as an object in `structuredContent`; the addresses are specific to this lookup.*
 
 For comparison, these selected fields come from the [recorded in-cluster DNS response](../results/raw/netprobe-call-dns_lookup.json), which checked `checkout` rather than the local example's public hostname:
 
@@ -281,6 +330,41 @@ When the model requests a tool, the loop routes the call to the server that owns
 The A2A SDK wrapper emits `working` updates per tool step, publishes the report as an artifact and ends in `completed` or `failed`. kagent requires port 8080, an agent card at `/.well-known/agent-card.json` and A2A 0.3 JSON-RPC at `/`. The card is also the readiness endpoint. The controller publishes its own card and injects `KAGENT_NAME`, `KAGENT_NAMESPACE` and `KAGENT_URL`.
 
 The image was 57 MB and its pod became Ready in 19 s. The report scenario diagnosed all five faults in 161 s with 21 tool calls, including DNS, TCP and HTTP probes of `checkout`. The [protocol reference](runtime-and-protocols.md#the-custom-agent-boundary) covers the request loop and container contract in detail.
+
+#### Deploy the BYO agent with YAML
+
+The reporter uses kagent's `Agent` resource with `type: BYO`. This is its [deployment manifest](../infra/kagent/agents/incident-reporter.yaml), with header comments omitted. The image must already be pushed, the referenced Secret must exist, and both MCP endpoints must be reachable. Replace `<ACCOUNT_ID>` with the build's ECR account.
+
+```yaml
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: incident-reporter
+  namespace: kagent
+spec:
+  description: Bring-your-own agent. Writes an incident report (summary, evidence, root cause, fix) for a namespace, using the built-in tool server and the netprobe MCP server directly.
+  type: BYO
+  byo:
+    deployment:
+      image: <ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/incident-reporter-agent:0.1.0
+      env:
+        - name: OPENROUTER_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kagent-openrouter
+              key: OPENROUTER_API_KEY
+        - name: MODEL
+          value: deepseek/deepseek-v4.1-flash
+        - name: KAGENT_TOOLS_URL
+          value: http://kagent-tools.kagent:8084/mcp
+        - name: NETPROBE_URL
+          value: http://netprobe-mcp.kagent:3000/mcp
+      resources:
+        requests: { cpu: 100m, memory: 256Mi }
+        limits: { memory: 512Mi }
+```
+
+Here the model is an environment variable and the key comes from a Secret reference; there is no `spec.declarative.modelConfig`, `systemMessage` or YAML tool list. The Python code owns the prompt, tool selection and ReAct loop. kagent runs the container and integrates its A2A interface, while the Dockerfile starts `src/server.py` on port 8080. The [setup guide](setup-guide.md#9-build-the-custom-agent-image) covers the image build, and [agent deployment](setup-guide.md#10-apply-model-prompt-and-agent-resources) covers applying the resources.
 
 #### Invoke the deployed agent directly
 

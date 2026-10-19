@@ -56,7 +56,7 @@ Approval badge: a small person-and-check mark on release-manager and sre-operato
 
 The counts describe the recorded build: 124 tools on kagent-tools, 65 on grafana-mcp, 4 on netprobe-mcp, 1 on fetch and 1 on querydoc; seven agents, five model configurations and five fault scenarios. Counts describe server inventories, not the tools offered to every agent. The operator's six mutating tools and the release manager's three mutating Helm tools are approval-gated. The custom agent sees six Kubernetes tools and four probes. Every number in a prompt is in the README, the runtime reference or a manifest; do not round or invent.
 
-Each image has one job. The overview (01) shows delegation and tool access; 02 shows delegation with approval through the orchestrator; 03 explains configuration; 04 explains deployment; 05 explains direct approval; 06 explains the custom loop. Keeping these concerns separate avoids dense, misleading connector networks.
+Each image has one job. The overview (01) shows delegation and tool access; 02 shows delegation with approval through the orchestrator; 03 explains configuration; 04 explains deployment; 05 explains direct approval; 06 explains the custom loop; 07 explains netprobe's files, discovery and tool contracts. Keeping these concerns separate avoids dense, misleading connector networks.
 
 ## Reviewing an output
 
@@ -478,3 +478,138 @@ A compact legend in the bottom-right corner, outside the container, with exactly
 FINAL CHECK — PRIVATE, DO NOT PRINT:
 One container boundary, one "kagent controller" card and one "OpenRouter" card on the left, one server box, one Startup box, one loop panel with five shapes, two MCP cards on the right, one callout, one note, five legend rows. Fifteen connectors: two between controller and server, one server → first step, one terminal → server, two grey discovery pairs plus one grey dependency, one purple model connector on the first step only, two blue execution pairs on the bottom-right step only, five cyan loop edges. Exactly one "message/send" label. The purple connector touches OpenRouter and the first step and nothing else. The report arrow's head is on the server box. Discovery connectors are grey; execution connectors are blue; both reach both MCP cards. No line joins the callout. No letters A to E are printed. No tool execution on the "No" branch. No printed layout words, no title.
 ```
+
+---
+
+## 07-netprobe-tool-discovery.jpg
+
+Where it is used: article, "Custom MCP tools" section; `byo/netprobe-mcp/README.md`, immediately after the tool descriptions. The user-supplied image was reviewed and saved as `07-netprobe-tool-discovery.jpg`; both documents embed the same asset with paths relative to their locations.
+
+Copy the complete prompt below into Google Nano Banana. Select **16:9 landscape** and the highest available resolution, preferably **4K**, in the generator settings. This is a reference diagram with four tool cards, so readable text matters more than decoration. A small functional title is specified for this diagram; the article caption supplies the longer explanation.
+
+Source of truth: `byo/netprobe-mcp/src/main.py`, `src/core/server.py` and the four files in `src/tools/`. Input and output schemas were checked against the installed FastMCP 3.0.0 tool registry. The current input schemas have `additionalProperties: false`; every output schema is a broad object with `additionalProperties: true`. The returned field lists below describe Python results, not precisely validated output schemas. The prompt keeps that distinction visible.
+
+```text
+Create a precise technical reference diagram of the netprobe-mcp Python MCP server. Output a high-resolution 16:9 landscape raster image with exceptionally readable labels. All directions below are private; print only the quoted labels. Do not render code, source listings, JSON documents or a terminal screenshot. Schema information appears as short field-and-type labels inside cards.
+
+VISUAL STYLE — PRIVATE:
+Flat minimalist engineering illustration, white background #FFFFFF, crisp Inter or Roboto typography, dark slate text #0F172A, secondary text #475569. Consistent rounded rectangles, thin borders, generous internal spacing. No shadows, gradients, 3D, textures, mascots or invented logos. Large bold functional title at the top: "netprobe-mcp: discovery and tool contracts". Medium bold card headings and clearly readable smaller field labels. Monospace lettering may be used for filenames, parameter names and schema terms, without making them look like executable code.
+
+Use the established project palette: slate #475569 with #F8FAFC fill for source-file and schema cards; cyan #0E7490 with #ECFEFF fill for the FastMCP server; amber #B45309 with #FFFBEB fill and a small coloured accent for tool cards; indigo #4F46E5 for the client. Keep fills pale. All four tool cards have equal visual weight.
+
+ICONS — PRIVATE:
+Equal-sized simple document icons beside source filenames; one server icon in the FastMCP card; one terminal/browser icon in the MCP client card; one small network icon in each tool card. Icons are labels' companions, never additional nodes. No cloud, Kubernetes, model-provider or database icons: this diagram concerns the Python server itself.
+
+SPATIAL LAYOUT AND EXACT LABELS — PRIVATE:
+Below the title, divide the upper third into a source-file panel on the left, a FastMCP server card in the centre and an MCP client card on the right. Place four equal tool cards as a two-by-two grid across the middle and lower portions. Reserve a bottom strip for a shared schema note, a scope note and a compact legend. Do not squeeze the four tool cards into one row. Align rows within each card and wrap long lines rather than abbreviating field names.
+
+Upper-left source-file panel, heading "Separate Python files". Use indented filename labels, not a code listing:
+"src/main.py — entry point"
+"src/core/server.py — loader + shared FastMCP instance"
+"src/tools/dns_lookup.py"
+"src/tools/tcp_connect.py"
+"src/tools/http_check.py"
+"src/tools/tls_cert_expiry.py"
+Small caption: "One probe per tool module"
+Small note: "__init__.py is skipped"
+
+Upper-centre card, heading "FastMCP server". Inside, three short stacked labelled areas:
+"DynamicMCPServer.load_tools()"
+"Module imports + @mcp.tool() registration"
+"Shared tool registry + generated schemas"
+Under them: "HTTP endpoint: /mcp"
+A small badge: "FastMCP 3.0.0"
+
+Upper-right card, heading "MCP client". Two short labels beneath it:
+"curl / Postman / agent application"
+"initialize → initialized → tools/list → tools/call"
+Use typographic right arrows only within this single label; they are not extra diagram connectors.
+
+Tool grid: top-left card heading "dns_lookup", filename label "dns_lookup.py".
+Subheading "Input schema" with exactly these labels:
+"hostname: string — required"
+Subheading "Returned fields" with exactly these labels:
+"Success: resolved=true"
+"addresses: string array"
+"canonical_name: string"
+"Failure: resolved=false; error: string"
+Bottom note: "Hostname only; no scheme or port"
+
+Tool grid: top-right card heading "tcp_connect", filename label "tcp_connect.py".
+Subheading "Input schema" with exactly these labels:
+"host: string — required"
+"port: integer — required"
+"timeout_seconds: number — default 3.0"
+Subheading "Returned fields" with exactly these labels:
+"Success: connected=true"
+"connect_ms: number; peer: [IP, port]"
+"Failure: connected=false"
+"error: string; connect_ms: number"
+Bottom note: "TCP reachability; no application check"
+The square brackets in the peer label describe the observed two-item result; they are not a declared tuple output schema.
+
+Tool grid: bottom-left card heading "http_check", filename label "http_check.py".
+Subheading "Input schema" with exactly these labels:
+"url: string — required"
+"timeout_seconds: number — default 5.0"
+Subheading "Returned fields" with exactly these labels:
+"Response: ok = status_code < 400"
+"status_code: integer; latency_ms: number"
+"final_url: string; server: string or null"
+"content_length: integer — bytes"
+"Failure: ok=false; error: string"
+"Network failures also include latency_ms"
+Bottom note: "HTTP/HTTPS GET; follows redirects"
+Keep the comparison in the first response label as a small textual fact, not a decision diamond or executable expression. An HTTP response with status 400 or above still has response fields; do not label every HTTP response as successful.
+
+Tool grid: bottom-right card heading "tls_cert_expiry", filename label "tls_cert_expiry.py".
+Subheading "Input schema" with exactly these labels:
+"host: string — required"
+"port: integer — default 443"
+"timeout_seconds: number — default 5.0"
+Subheading "Returned fields" with exactly these labels:
+"Success: valid_now: boolean"
+"days_remaining: integer; not_after: ISO 8601 string"
+"issuer: object; subject: object"
+"san: string array; tls_version: string or null"
+"Failure: valid_now=false; error: string"
+Bottom note: "CA + hostname verification enabled"
+
+Shared schema note along the bottom-left, with pale yellow #FEF9C3 fill and dark text. Heading "Schema precision matters". Exactly three readable lines:
+"All inputs: object; extra arguments rejected"
+"All outputSchema values: object; additional properties allowed"
+"Returned fields describe observations; they are not a typed output contract"
+
+Scope note above or beside the schema note, secondary text:
+"Local process or pod: probes observe the server's network"
+Do not connect the note to anything.
+
+VISUAL CONNECTIONS — PRIVATE:
+All connectors stay in the upper third, outside the four tool cards; those cards are an inventory, not a second execution pipeline. Exactly five connectors, each with its own short label:
+1. Thin solid grey #94A3B8 arrow pointing right from the source-file panel to the top of the FastMCP card, labelled "Import + register".
+2. Medium solid indigo #4F46E5 arrow pointing left from the MCP client to the FastMCP card, labelled "tools/list".
+3. Thin dashed steel-blue #0369A1 arrow pointing right from the FastMCP card to the MCP client, labelled "Tool definitions".
+4. Medium solid indigo #4F46E5 arrow pointing left from the MCP client to the FastMCP card, labelled "tools/call + arguments".
+5. Thin dashed steel-blue #0369A1 arrow pointing right from the FastMCP card to the MCP client, labelled "content + structuredContent".
+Arrange the four client/server arrows as clearly separated horizontal lanes. No double-headed arrows, crossing lines, unlabeled arrows or arrows from the client to individual Python files. The tool grid, notes, badges and legend have no connectors.
+
+LEGEND — VISIBLE:
+A compact box at the bottom-right with exactly three rows:
+Grey solid arrow "Startup registration"
+Indigo solid arrow "Client request"
+Steel-blue dashed arrow "Server response"
+
+FINAL CHECK — PRIVATE, DO NOT PRINT:
+One title, six source filenames, one FastMCP server card, one client card, exactly four tool cards, exactly five labelled connectors and three legend rows. Every argument is attached to the correct tool with its exact required status and default. No lower/upper port or timeout bounds: the current input schemas do not declare them. The field lists are labelled Returned fields, never strict output schemas. All four actual output schemas remain broad objects. Source-file loading/registration is distinct from a client's tools/list discovery. tools/list does not execute a probe. There is one shared server and one HTTP endpoint, not one server per Python file. A failed diagnostic finding does not automatically mean MCP isError=true. TLS verification is enabled. No secrets, live account names, hostnames from private environments, provider logos, cloud deployment boxes, extra tools or imaginary framework components.
+```
+
+### Companion diagrams worth adding
+
+These are suggestions, not additional generated assets. Start with the first if one more diagram is useful; the existing [04 deployment diagram](04-kmcp-two-ways.jpg) already covers the stdio/native HTTP distinction.
+
+1. **One MCP request from wire to function and back.** A short `dns_lookup` sequence: initialize and the server-issued session, initialized notification, `tools/list`, `tools/call`, argument validation, Python DNS function and the response. Highlight JSON-RPC request ID versus MCP session ID, and show that SSE is response framing. This complements 07's file and schema inventory.
+2. **Protocol error, tool error and diagnostic finding.** Three side-by-side examples: missing tool name → JSON-RPC `error`; missing `url` → `result.isError=true`; DNS failure or unsupported scheme returned as data → `result.isError=false` with a negative finding. This makes HTTP success versus tool/target success visible.
+3. **Why execution location matters.** The same client against a local Python process and a port-forwarded in-cluster pod. Put the DNS/TCP/HTTP work inside the server boundary in both cases; show that port-forwarding moves the client connection, not the probe execution. A Service can resolve even without endpoints.
+4. **From a typed function to a discovered contract.** One small DNS function, its exact input schema, the current broad object output schema and an optional future Pydantic result model shown as a proposed improvement. This is useful for learning schema precision; keep future design visibly separate from the current implementation.
+
+For the agent, [06-byo-agent-loop.jpg](06-byo-agent-loop.jpg) already shows the custom loop and the MCP/A2A boundaries. A new agent diagram would be most useful if focused on task states, progress events and the final artifact rather than repeating that loop.

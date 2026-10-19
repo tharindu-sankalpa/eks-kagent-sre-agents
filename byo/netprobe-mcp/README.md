@@ -31,6 +31,10 @@ FastMCP derives the tool schemas from type hints and docstrings. The functions r
 
 `http_check` accepts HTTP/HTTPS URLs and follows redirects. `tls_cert_expiry` uses certifi's CA bundle for certificate and hostname verification. An invalid or expired certificate can fail the handshake and return an error instead of expiration metadata. This is a connectivity/evidence tool, not a certificate-inspection tool that bypasses verification.
 
+![netprobe Python files, FastMCP registration and discovery, and the four tools' input contracts and returned fields](../../docs/diagrams/07-netprobe-tool-discovery.jpg)
+
+*Each probe has its own Python module. The loader imports those modules, their decorators register tools on the shared FastMCP instance, and clients discover the definitions with `tools/list`. Input schemas declare arguments; the current output schemas declare only an object, while the cards describe the fields returned by the functions.*
+
 ## Run locally
 
 Run these commands from `byo/netprobe-mcp/`. Python 3.12 and uv are required; the manual HTTP examples below also use curl and jq.
