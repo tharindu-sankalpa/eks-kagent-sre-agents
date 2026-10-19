@@ -1,10 +1,20 @@
 # A multi-agent system for SRE workflows on Amazon EKS with kagent and kmcp
 
-I built and tested a multi-agent system for SRE workflows on Amazon EKS using kagent and kmcp. An orchestrator uses specialist agents as tools to diagnose Kubernetes faults and coordinate repairs. Before a change runs, the operator's approval gate pauses execution and surfaces the proposed tool call to the user—even when another agent called the operator.
+I built and tested a multi-agent system for SRE workflows on Amazon EKS using kagent and kmcp. An orchestrator uses specialist agents as tools to diagnose Kubernetes faults and coordinate repairs. Agents can pause to ask the user for missing information or clarify the intended repair. Before a change runs, the operator's approval gate also pauses execution and surfaces the proposed tool call to the user—even when another agent called the operator.
 
-Six of the seven agents are defined in YAML: a model reference, system instructions and allowed tool calls. kagent deploys them and supplies the built-in operational tools. Its Python runtime builds on Google's Agent Development Kit (ADK). kmcp deploys Model Context Protocol (MCP) tool servers, including a network-probe server I developed. The seventh agent is my own Python tool-calling loop, exposed through the Agent-to-Agent (A2A) protocol.
+Six of the seven agents in this multi-agent system are declarative: their model reference, system instructions and allowed tool calls are defined in YAML. kagent deploys them using its runtime built on Google's Agent Development Kit (ADK). kagent also supports bring-your-own (BYO) agents: custom containers that serve the Agent-to-Agent (A2A) protocol. The seventh agent, the incident reporter, follows this path. I wrote its Python ReAct tool-calling loop myself rather than using a framework's built-in loop; the A2A Python SDK handles the server interface.
+
+The kagent Helm installation comes with built-in Model Context Protocol (MCP) tool servers for Kubernetes, Helm, Prometheus, Grafana, Argo Rollouts and other operational systems. We can deploy existing MCP server packages for Node.js or Python, such as the documentation-fetch server, through kmcp by defining an `MCPServer` custom resource in YAML. kmcp can also deploy MCP servers from custom container images. My BYO network-probe server is built with FastMCP and deployed through kmcp. For declarative agents, YAML defines the agent's behaviour for kagent's runtime. For MCP servers, YAML tells kmcp how to run a server whose tools are already implemented in the package or container image.
 
 The test environment was one EKS 1.34 cluster in `ap-south-1`, with two `t3.xlarge` nodes and five deliberately broken workloads. The troubleshooter diagnosed all five individual faults. The orchestrator repaired a Service through two human decisions and verified three endpoints. Its longest diagnostic request never completed: testing exposed a controller timeout, overlapping abandoned requests and a memory failure.
+
+![Amazon EKS console showing two Ready t3.xlarge nodes in the workers node group](screenshots/aws-console-eks-compute-nodes.png)
+
+*The EKS test cluster in `ap-south-1`: two `t3.xlarge` On-Demand nodes, both Ready.*
+
+![k9s showing demo-broken pods: api in ImagePullBackOff, batch Pending, cache and worker in CrashLoopBackOff, and two Running web pods](screenshots/image.png)
+
+*The demo workloads in k9s during a later AKS run: image-pull failures, a pending pod and restarting containers alongside two healthy `web` pods. This screenshot illustrates the workloads; the test results reported here are from EKS.*
 
 The repository contains the manifests, custom code, API collection, raw responses and original build record. The framework provides the runtime and protocol integration; this project defines the specialist roles, adds custom capabilities and checks the resulting behavior against cluster evidence.
 
@@ -12,13 +22,23 @@ Repository: https://github.com/tharindu-sankalpa/eks-kagent-sre-agents
 
 ## Reading path
 
-- [Delegation and approval in one repair](#delegation-and-approval-in-one-repair)
-- [What the frameworks provide](#what-the-frameworks-provide)
-- [Defining an agent in YAML](#defining-an-agent-in-yaml)
-- [Specialists and custom implementations](#specialists-and-custom-implementations)
-- [Deployment choices](#deployment-choices)
-- [Method](#method), [results](#results) and [findings](#findings)
-- [Limitations](#limitations) and [reproduction](#reproduce-it)
+- [A multi-agent system for SRE workflows on Amazon EKS with kagent and kmcp](#a-multi-agent-system-for-sre-workflows-on-amazon-eks-with-kagent-and-kmcp)
+  - [Reading path](#reading-path)
+  - [Delegation and approval in one repair](#delegation-and-approval-in-one-repair)
+  - [What the frameworks provide](#what-the-frameworks-provide)
+    - [kagent: configuration, runtime and built-in tools](#kagent-configuration-runtime-and-built-in-tools)
+    - [kmcp: running tool servers on Kubernetes](#kmcp-running-tool-servers-on-kubernetes)
+    - [The two protocol boundaries](#the-two-protocol-boundaries)
+  - [Defining an agent in YAML](#defining-an-agent-in-yaml)
+  - [Specialists and custom implementations](#specialists-and-custom-implementations)
+    - [Custom MCP tools: checking the network from inside the cluster](#custom-mcp-tools-checking-the-network-from-inside-the-cluster)
+    - [Custom agent: owning the tool-calling loop](#custom-agent-owning-the-tool-calling-loop)
+  - [Deployment choices](#deployment-choices)
+  - [Method](#method)
+  - [Results](#results)
+  - [Findings](#findings)
+  - [Limitations](#limitations)
+  - [Reproduce it](#reproduce-it)
 
 For request fields, tool inventories and transport details, see the [runtime and protocol reference](runtime-and-protocols.md). For copyable deployment commands, use the [setup guide](setup-guide.md). The [build record](build-record.md) retains the complete investigation and outputs.
 
