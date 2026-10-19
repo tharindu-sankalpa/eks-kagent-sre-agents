@@ -9,11 +9,11 @@ Repository: https://github.com/tharindu-sankalpa/eks-kagent-sre-agents
 ## Editorial decisions
 
 - **Twelve pages, with a five-minute reading path.** The title and takeaway on every page should tell the story in about five minutes. Reading the evidence and excerpts should take closer to ten. These are design targets, not measured reading times.
-- **Show the system, then a real repair.** Page 2 uses the existing main architecture diagram. Page 3 explains the two different human decisions and the verified outcome before introducing resource fields.
+- **Show the system, then a real repair.** Page 2 uses the supplied portrait architecture diagram. Page 3 explains the two different human decisions and the verified outcome before introducing resource fields.
 - **Give the custom work space.** netprobe and the incident reporter each get a page. Separate the framework's deployment/runtime features from the probe functions, custom loop and validation work written here.
 - **Keep implementation examples selective.** One short declarative excerpt and two small BYO deployment excerpts are enough. Model-provider configuration, prompt-template variants and the three tool-source resource kinds belong in the article/reference.
 - **Include interaction, not only automation.** Show the web UI, local MCP discovery/calls and invoking the deployed agent. The scripts are an optional repeatable test path.
-- **Use evidence with a purpose.** One readable repair screenshot is more useful than several small UI inventory screenshots. Full schemas, tool catalogues and responses are linked from the component READMEs.
+- **Use three focused evidence screenshots.** The kagent question on page 3 shows the user interaction, the EKS nodes on page 4 show the test platform, and the later Langfuse trace on page 9 shows the recorded question, choices and answer. Crop each for its purpose. Full schemas, tool catalogues and responses are linked from the component READMEs.
 - **Bound claims to the recorded run.** The main results describe EKS on 2026-10-07. Later local or AKS captures are not substitutes for those measurements. Human input and approval are distinct; task completion and answer accuracy are distinct.
 
 ## Review of the supplied PDF
@@ -23,9 +23,9 @@ Repository: https://github.com/tharindu-sankalpa/eks-kagent-sre-agents
 | Observation in the supplied export | Change for the next version |
 |---|---|
 | The cover still says “multi-agent orchestration” and has four explanatory points competing with the headline. | Use “multi-agent system,” a short purpose statement and one bounded result. |
-| Page 2 redraws a simplified system and omits the OpenRouter and platform context present in the main diagram. | Embed `docs/diagrams/01-system-overview.jpg` directly. Explain the main path in three short takeaways. |
+| Page 2 redraws a simplified system and omits the OpenRouter and platform context present in the main diagram. | Embed the supplied portrait version, `docs/diagrams/08-system-overview-portrait.jpg`, directly. Give it most of the page. |
 | Configuration occupies much of pages 4–10; the custom reporter's implementation has no dedicated page. | Consolidate configuration and add dedicated MCP-server and BYO-agent pages. |
-| Page 3's ECR screenshot extends below the page; its second caption and footnote are absent. `ap-south-1` also wraps mid-name in the first caption. | Remove the dedicated console-gallery page. Keep environment facts in the architecture caption; retain the screenshots in the article/build record. |
+| Page 3's ECR screenshot extends below the page; its second caption and footnote are absent. `ap-south-1` also wraps mid-name in the first caption. | Remove the console-gallery layout. Use one focused EKS node-table crop on the new page 4 with its own reserved caption space. |
 | Page 8 reaches the lower edge; the stdio-package explanation and reserved footer space are lost. | Use shorter excerpts and a fixed footer exclusion area. Treat overflow as an error. |
 | Page 5's narrow columns wrap code, image names and endpoints into awkward fragments. Other code cards also carry long lines. | Stack short full-width code cards. Use selected fields, not two miniature manifests side by side. |
 | Results arrive only on page 14, and the repair is first explained on page 12. | Put a result on the cover and the repair on page 3; keep the complete outcome breakdown near the end. |
@@ -40,10 +40,10 @@ Keep the consistent typography, restrained palette, clear stat tiles and separat
 - Use Inter or a similar sans-serif. Suggested A4 sizes: headline 28–34 pt, body 16–18 pt, captions 12–14 pt, code 12–14 pt. The cover may have a three-line headline; other pages should have at most two. Font sizes are starting points: check the exported document at phone width as well as at 100% on desktop.
 - Aim for roughly 60–110 words of visible prose per page, excluding the architecture image, code and source labels. Page 10's results table is the intentional exception. Cut content before reducing type size.
 - Canvas `#FAFAFA`; dark text `#0F172A`; secondary text `#475569`. Use indigo `#4F46E5` for requests/orchestration, blue `#2563EB` for diagnosis, amber `#B45309` for execution approval, cyan `#0E7490` for BYO components. Keep fills pale.
-- Every page has a short kicker, a headline, one main visual or content group, one takeaway and `n/12`. Sources can be a short repository path; no long file path squeezed into a headline.
+- Every page has a short kicker, a headline, one main visual or content group, one takeaway and `n/12`. The portrait architecture page uses a compact header and caption to maximize the image area. Sources can be a short repository path; no long file path squeezed into a headline.
 - **Reuse supplied diagrams without regenerating or reconstructing them.** Preserve their aspect ratios and labels. On page 2 the architecture is the main visual; avoid a competing illustration, lengthy legend or code block.
-- The main diagram is detailed. Fit it to the full available width without cutting off its legend, OpenRouter box or platform strip. The three takeaways beneath it must remain readable without zooming. If small diagram labels cannot be read, direct readers to the full-resolution asset in the repository; do not pretend they are legible or stretch the image vertically.
-- Screenshots support a specific observation, not general claims that “everything works.” Use the supplied repair crop on page 3. Do not add every available screenshot or diagram. The detailed netprobe contracts diagram remains in the article and MCP README; shrinking it onto a summary page would hide its useful detail.
+- The portrait diagram is detailed. Fit the complete image inside the available width and height, preserving its legend, OpenRouter box and platform strip. Allow approximately 225 mm of image height on page 2; reduce header copy to make room. Do not squeeze three extra explanation paragraphs beneath it. If small diagram labels cannot be read, direct readers to the full-resolution asset in the repository; do not stretch or crop the architecture to force a fit.
+- The three requested screenshot placements are required. Crop browser chrome, desktop UI and unrelated sidebars so the evidence is large enough to read. Keep the original files unchanged; cropping instructions below describe the PDF placements. Crops must preserve complete questions, choices, answer text and node rows. Do not regenerate, repaint or edit the observed values. The detailed netprobe contracts diagram remains in the article and MCP README.
 - Use full-width code cards, a monospace face, no line numbers and no more than 12 lines per card. Page 8 has two stacked cards of 7 and 5 lines. Label every excerpt as selected fields, not an apply-ready manifest. Do not wrap an identifier, hostname or image tag in the middle; shorten the excerpt instead.
 - No decorative cover graph, invented logos, stock imagery or generic AI art. Preserve the exact source text and numbers below. A designer may change line breaks and spacing, but must report any substantive edit or overflow.
 - Keep links clickable in the exported PDF where supported, and print the repository address as readable text. Put the destination links in the accompanying post too. Do not make platform-dependent link behavior the only way to find the work.
@@ -76,21 +76,13 @@ Print the repository address on a separate readable line: `github.com/tharindu-s
 
 **Headline:** `How the pieces fit`
 
-**Main visual:** Use **`docs/diagrams/01-system-overview.jpg`**, the same main architecture diagram used in the article and repository README. Place it full-width at its native aspect ratio. Do not draw a replacement specialist graph.
+**Main visual:** Use **`docs/diagrams/08-system-overview-portrait.jpg`**, the user-supplied portrait architecture image. This replaces the previous landscape asset for this PDF. Keep `01-system-overview.jpg` as the existing landscape asset used in the other documents. Place the new image at its native aspect ratio, centered and fitted to the available page height. Do not draw a replacement specialist graph.
 
-**Three takeaways beneath it:**
+**Layout:** Reserve most of the page for the image: approximately 225 mm high, a short header above and one compact caption below. Keep the whole architecture, including the legend and platform strip. No screenshot, code card or additional diagram on this page.
 
-1. **A2A connects agents.** The orchestrator delegates to six specialists; it has no direct Kubernetes tools.
-2. **MCP connects tools.** Each specialist sees a selected subset of the operational and custom tools.
-3. **Two deployment layers.** kagent runs agents; kmcp runs the additional MCP servers. Models are reached through OpenRouter.
+**Caption:** `A2A connects agents; MCP connects tools. kagent runs agents, kmcp runs the additional MCP servers, and models are reached through OpenRouter.`
 
-**Environment caption, two fixed lines:**
-
-`Amazon EKS 1.34 · 2 × t3.xlarge · ap-south-1`
-
-`kagent 0.9.10 · kmcp 0.3.0 · 2026-10-07 test environment`
-
-Keep `ap-south-1` unbroken. All seven agents, five tool servers and the external model endpoint belong to this map; a single request need not invoke every specialist or tool server.
+**Small source line:** `Recorded EKS environment: 2026-10-07 · Full-resolution diagram in the repository.` All seven agents, five tool servers and the external model endpoint belong to this map; a single request need not invoke every specialist or tool server.
 
 ## Page 3 · one repair, two different human decisions
 
@@ -108,7 +100,9 @@ Keep `ap-south-1` unbroken. All seven agents, five tool servers and the external
 4. **Execution approval:** the runtime pauses the operator's exact `k8s_patch_resource` call.
 5. The approved patch changes the selector. `kubectl` confirms **three endpoints**.
 
-**Evidence:** `docs/screenshots/crops/s15-orchestrator-ask-user.png`, placed below the sequence only if the question remains readable. Caption: `A separate UI run shows the backend-selection question. The original API transcripts and kubectl checks establish the recorded repair outcome.` If the crop is too small, omit it and retain the source path; do not shrink the five-step explanation.
+**Required screenshot:** Crop **`docs/screenshots/kagent-ui-orchestrator-ask-user-question.png`** to the main conversation panel. Make the completed `cluster-troubleshooter` card and the full **Questions for you** panel visible, including the proposed selector change, all three choices and the Submit button. Remove browser chrome, the desktop dock, chat history and Agent Details sidebar. The existing `docs/screenshots/crops/s15-orchestrator-ask-user.png` can be used only if it retains those details at readable size.
+
+**Caption:** `A separate UI run shows the proposed repair and asks which backend is intended. The original API transcripts and kubectl checks establish the measured repair outcome.` Reserve the lower part of the page for the crop. If it competes with the sequence, shorten the sequence's labels; keep both the screenshot and the two distinct pause bands.
 
 **Takeaway:** `Choosing the repair and approving its execution are separate decisions.`
 
@@ -122,19 +116,21 @@ Keep `ap-south-1` unbroken. All seven agents, five tool servers and the external
 
 **Headline:** `Framework capabilities, custom implementation`
 
-**Main visual:** Two readable stacked groups, not narrow text columns.
+**Main visual:** Two compact stacked groups above a full-width EKS node-table crop. Keep four short bullets in total so the screenshot and caption fit.
 
 **kagent and kmcp supplied:**
 
 - Agent deployment, the declarative ADK-based runtime, A2A integration and approval support.
-- Bundled operational MCP tools for Kubernetes, Helm, Prometheus, Grafana and other systems.
-- MCP server deployment from an existing package or a custom image.
+- Bundled operational tools; kmcp deployment of existing or custom MCP servers.
 
 **This project added:**
 
-- Six declarative agent definitions, including the orchestrator, with selected tools and instructions.
-- Four FastMCP network probes and a BYO incident reporter with its own Python loop.
-- Container builds pushed to ECR, a broken-workload lab, manual/API walkthroughs and recorded checks.
+- Six declarative agent definitions, four FastMCP probes and a BYO reporter with its own Python loop.
+- ECR image builds, a broken-workload lab, manual/API walkthroughs and recorded checks.
+
+**Required screenshot:** Crop **`docs/screenshots/aws-console-eks-compute-nodes.png`** to **Nodes (2)**, the column headings and both node rows. Retain the instance-type, node-group and Ready-status columns; remove browser chrome, the desktop dock, the left navigation and the large empty overview area. Do not cut off the right-hand status column as the earlier export did. The crop should show both rows together, rather than two disconnected node snippets.
+
+**Caption:** `Amazon EKS console, 2026-10-07: two t3.xlarge On-Demand nodes in workers, both Ready. Region: ap-south-1.` Keep `ap-south-1` unbroken.
 
 **Takeaway:** `The deployment platform is reusable; the roles, custom code and evidence define this project.`
 
@@ -266,21 +262,25 @@ Caption: `kagent runs the custom agent. Its container serves A2A at / on port 80
 
 **Sources:** `infra/kmcp/netprobe-mcpserver.yaml`; `infra/kagent/agents/incident-reporter.yaml`; `docs/setup-guide.md`.
 
-## Page 9 · trying the interfaces yourself
+## Page 9 · inspect the question, answer and delegation
 
 **Kicker:** `INTERACTIVE WALKTHROUGHS`
 
-**Headline:** `Start with the UI. Inspect the protocols next.`
+**Headline:** `See what the agent asked—and what the user chose`
 
-**Main visual:** Three stacked cards with these labels and text:
+**Required screenshot:** Use **`docs/screenshots/langfuse-orchestrator-operator-trace.png`** as the main evidence, focused on the selected `ask_user` observation. Keep the trace identity (`sre-orchestrator` / `ask_user`) and the right-hand **Input** and **Output** details, including the backend-selection question, all four choices and the recorded answer choosing `app=web`.
 
-- **Ask an agent.** Port-forward the kagent UI, select an agent and send a question. Expand tool calls and respond to input or approval prompts when they appear.
-- **Call MCP directly.** Run netprobe locally with uv, without a container. Use curl/jq or Postman: initialize, send the initialized notification, list tools, call a tool. No model is needed.
-- **Invoke the BYO agent.** Port-forward `svc/incident-reporter` on `8091:8080`. Read its card, then use A2A `message/send` or `message/stream`. The agent makes its own model and MCP calls.
+**Crop treatment:** Remove the browser chrome and URL bar, desktop dock, left navigation, project/trace listing, account label and unrelated RAG traces. Prefer a focused crop of the relevant trace branch beside the question-and-answer panel. If the input and selected answer become too small together, use two clearly labelled detail crops from the same screenshot: **Question and choices** and **Recorded answer**. Do not stitch them into a fabricated continuous UI view. Keep the `ask_user` label visible. Reduce surrounding prose before reducing the screenshot size.
 
-**Takeaway:** `MCP at /mcp and A2A at / are different interfaces; both have copyable examples in the repository.`
+**Caption:** `Later run, 2026-10-18: the Langfuse trace records the backend question, four choices and the answer selecting app=web. It also shows delegation to sre-operator. This is separate from the original EKS measurements.` If a detail crop omits the delegation branch, omit the sentence about the branch from the caption too.
 
-**Source line:** `Postman folders 4b and 6 · component READMEs · setup guide section 12`. Add a smaller note: `A2A at / refers to the direct reporter Service; the controller uses /api/a2a/... routes. The scripts remain available for repeatable runs.`
+**Native PDF callout:** `Selected answer: repoint checkout to app=web.` This repeats the visible choice in readable PDF text; it is not evidence that the patch executed.
+
+**Compact try-it strip:** `Web UI: ask and respond · Local MCP: initialize → list → call · BYO agent: port-forward → A2A request`. In the source note, clarify that the full MCP sequence includes `notifications/initialized` before listing tools.
+
+**Takeaway:** `Inspect the question and response as well as the final answer. User input is distinct from tool execution approval.`
+
+**Source line:** `Postman folders 4b and 6 · component READMEs · setup guide section 12`. The READMEs have the complete curl/jq commands: local netprobe without a container, and `svc/incident-reporter` forwarded on `8091:8080`. MCP uses `/mcp`; direct reporter A2A uses `/`; controller A2A uses `/api/a2a/...`. Scripts remain the repeatable test path. Do not add a full third code or text panel to this screenshot-led page.
 
 ## Page 10 · method and measured outcomes
 
@@ -353,10 +353,12 @@ Link the repository text to `https://github.com/tharindu-sankalpa/eks-kagent-sre
 
 ## Asset and evidence policy
 
-- Main architecture: **`docs/diagrams/01-system-overview.jpg` on page 2**, reused directly.
-- Repair screenshot: `docs/screenshots/crops/s15-orchestrator-ask-user.png` on page 3 if readable. It is a separate UI run; the original API results supply the measured timing and endpoint verification.
+- PDF architecture: **`docs/diagrams/08-system-overview-portrait.jpg` on page 2**, reused directly. The prior landscape `01-system-overview.jpg` remains in the article and README; it is not the page 2 asset for this export.
+- Required repair screenshot: **`docs/screenshots/kagent-ui-orchestrator-ask-user-question.png` on page 3**, cropped to the completed specialist call and full user-question panel. It is a separate UI run; the original API results supply the measured timing and endpoint verification.
+- Required EKS screenshot: **`docs/screenshots/aws-console-eks-compute-nodes.png` on page 4**, cropped to the two-node table with instance types and Ready status. Preserve both rows and the complete caption.
+- Required trace screenshot: **`docs/screenshots/langfuse-orchestrator-operator-trace.png` on page 9**, cropped to the relevant `ask_user` trace and its question, choices and recorded answer. Remove the URL/project/account UI. Label it as a later 2026-10-18 run; do not transfer its durations, choices or two-pod count into the original EKS results.
 - The new `07-netprobe-tool-discovery.jpg` and existing `06-byo-agent-loop.jpg` are source references for pages 6–7 and remain embedded at useful resolution in the component documentation/article.
-- Do not use the AKS pod screenshot or the 2026-10-18 Langfuse trace to illustrate the original EKS measurements without an explicit later-run label. They are not necessary for this summary.
+- The AKS pod screenshot is not needed for this summary. The later Langfuse capture illustrates the interaction; its caption must distinguish it from the original EKS measurements.
 - Full MCP results: `results/raw/netprobe-call-dns_lookup.json`, `netprobe-call-tcp_connect.json`, `netprobe-call-http_check.json`, `netprobe-call-tls_cert_expiry.json` and `kagent-tools-tools-list.json`.
 - Reporter evidence: `results/answers/incident-reporter/s12.json` and `s12.txt`. Scenario listing: `scripts/scenarios.txt` for s01–s14; s15 and its human exchanges are in build-record section 16. Outcome verdicts are in the article.
 
@@ -364,8 +366,10 @@ Link the repository text to `https://github.com/tharindu-sankalpa/eks-kagent-sre
 
 - Twelve A4 portrait pages, every page numbered `n/12`, with no old `n/16` footers.
 - Cover uses “multi-agent system,” describes the SRE purpose and includes one measured outcome.
-- Page 2 uses the actual main architecture image, without redrawing, cropping, stretching or swapping it for a simplified graph.
+- Page 2 uses `08-system-overview-portrait.jpg`, fitted by height and width without redrawing, cropping or stretching. Its whole legend, OpenRouter box and platform strip remain visible.
 - The repair appears before configuration details. User input is distinct from execution approval.
+- All three requested screenshots appear: kagent question on page 3, EKS nodes on page 4, Langfuse question/answer on page 9. Browser chrome and unrelated UI are cropped out; original source files remain unchanged.
+- The EKS crop retains both node rows, instance types and Ready status. The kagent crop retains the full question and three choices. The Langfuse crop retains the question, four choices and selected answer, with a later-run caption. No crop silently removes the evidence it is meant to show.
 - netprobe and the reporter each have a dedicated page. FastMCP and the A2A Python SDK are credited for their actual roles; the custom loop is not attributed to ADK.
 - YAML excerpts have source labels and are visibly partial. No wrapped image tags, dropped indentation or implication that the snippets are deployable as shown.
 - Page 10 counts sum to 15. Approval tests, retries and human follow-ups are distinguished from those 15 scenarios.
